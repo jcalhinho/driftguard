@@ -1,0 +1,2 @@
+[console_scripts]
+driftguard = cli:main

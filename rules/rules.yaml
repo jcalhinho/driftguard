@@ -1,0 +1,157 @@
+# Règles de breaking changes d'API — format v1
+#
+# Chaque règle décrit UN changement cassant d'une API :
+#
+# id:        identifiant unique (provider-slug)
+# provider:  fournisseur de l'API
+# title:     titre humain du breaking change
+# severity:  info | warning | critical
+# patterns:  expressions régulières détectant l'usage concerné (une ou plusieurs)
+# fix_hint:  conseil de correction affiché dans l'issue/la PR
+# migration: lien vers le guide de migration officiel
+# replace:   (optionnel) mapping de remplacement mécanique sûr {ancien: nouveau}
+# since:     date d'introduction de la règle (YYYY-MM-DD)
+
+rules:
+  - id: stripe-charges-api-deprecated
+    provider: Stripe
+    title: "L'API Charges est dépréciée — utilisez Payment Intents"
+    severity: critical
+    patterns:
+      - "stripe\\.charges\\.create"
+      - "stripe\\.charges\\.retrieve"
+      - "charges/create"
+    fix_hint: "Remplacer par stripe.paymentIntents.create() et suivre le guide de migration."
+    migration: "https://docs.stripe.com/payments/payment-intents/migration"
+    replace:
+      "stripe.charges.create": "stripe.paymentIntents.create"
+      "stripe.charges.retrieve": "stripe.paymentIntents.retrieve"
+    since: "2026-09-27"
+
+  - id: stripe-sources-api-deprecated
+    provider: Stripe
+    title: "L'API Sources est dépréciée"
+    severity: warning
+    patterns:
+      - "stripe\\.sources\\.create"
+    fix_hint: "Migrer vers Payment Methods (stripe.paymentMethods.create())."
+    migration: "https://docs.stripe.com/payments/payment-methods"
+    since: "2026-09-27"
+
+  - id: openai-text-davinci-003-shutdown
+    provider: OpenAI
+    title: "Le modèle text-davinci-003 est retiré du service"
+    severity: critical
+    patterns:
+      - "text-davinci-003"
+      - "code-davinci-002"
+    fix_hint: "Migrer vers un modèle récent (gpt-4o, gpt-4o-mini) ou un modèle compatible."
+    migration: "https://platform.openai.com/docs/deprecations"
+    since: "2026-09-27"
+
+  - id: github-oauth-password-grant
+    provider: GitHub
+    title: "Le flux OAuth par mot de passe est désactivé"
+    severity: critical
+    patterns:
+      - "access_token\\?[^\"'\\s]*grant_type=password"
+    fix_hint: "Migrer vers le device flow ou le web application flow OAuth."
+    migration: "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps"
+    since: "2026-09-27"
+
+  - id: github-auth-token-header
+    provider: GitHub
+    title: "En-tête « Authorization: token » déprécié au profit de Bearer"
+    severity: info
+    patterns:
+      - "Authorization['\"]?\\s*[:=]\\s*['\"]?token\\s"
+    fix_hint: "Utiliser « Authorization: Bearer <token> »."
+    migration: "https://github.blog/2021-04-05-behind-githubs-new-authentication-token-formats/"
+    since: "2026-09-27"
+
+  - id: slack-rtm-start-deprecated
+    provider: Slack
+    title: "rtm.start est déprécié — utiliser rtm.connect"
+    severity: warning
+    patterns:
+      - "rtm\\.start"
+    fix_hint: "Appeler rtm.connect puis ouvrir la WebSocket renvoyée."
+    migration: "https://api.slack.com/methods/rtm.connect"
+    replace:
+      "rtm.start": "rtm.connect"
+    since: "2026-09-27"
+
+  - id: slack-legacy-tokens
+    provider: Slack
+    title: "Tokens legacy (xoxp-/xoxo-) retirés"
+    severity: critical
+    patterns:
+      - "xoxp-[A-Za-z0-9-]+"
+      - "xoxo-[A-Za-z0-9-]+"
+    fix_hint: "Recréer une application Slack et utiliser des tokens xoxb- avec les scopes minimaux."
+    migration: "https://api.slack.com/authentication/token-types"
+    since: "2026-09-27"
+
+  - id: twilio-lookups-v1-deprecated
+    provider: Twilio
+    title: "API Lookups v1 dépréciée au profit de v2"
+    severity: warning
+    patterns:
+      - "/v1/PhoneNumbers"
+      - "lookups\\.v1"
+    fix_hint: "Migrer vers l'API Lookups v2."
+    migration: "https://www.twilio.com/docs/lookups/api"
+    since: "2026-09-27"
+
+  - id: openai-legacy-completions-endpoint
+    provider: OpenAI
+    title: "L'endpoint legacy /completions est en fin de vie pour les anciens modèles"
+    severity: warning
+    patterns:
+      - "openai\\.completions\\.create"
+      - "openai\\.Completion\\.create"
+    fix_hint: "Migrer vers l'API Chat Completions (client.chat.completions.create)."
+    migration: "https://platform.openai.com/docs/deprecations"
+    since: "2026-09-27"
+
+  - id: sendgrid-apikey-basic-auth
+    provider: SendGrid
+    title: "L'API v2 (basic auth « apikey ») est retirée — utiliser v3 Bearer"
+    severity: warning
+    patterns:
+      - "v2/mail/send"
+      - "sendgrid\\./v2"
+    fix_hint: "Migrer vers l'API v3 avec « Authorization: Bearer SG.… »."
+    migration: "https://docs.sendgrid.com/for-developers/sending-email/upgrade-your-authentication-method-to-api-keys"
+    since: "2026-09-27"
+
+  - id: aws-s3-path-style-deprecated
+    provider: AWS
+    title: "Les URLs S3 path-style sont dépréciées"
+    severity: info
+    patterns:
+      - "https://s3\\.amazonaws\\.com/"
+      - "https://[a-z0-9-]+\\.s3\\.amazonaws\\.com/"
+    fix_hint: "Migrer vers le style virtual-hosted (bucket.s3.region.amazonaws.com)."
+    migration: "https://aws.amazon.com/blogs/aws/amazon-s3-path-deprecation-plan-the-rest-of-the-story/"
+    since: "2026-09-27"
+
+  - id: stripe-pinned-old-api-version
+    provider: Stripe
+    title: "Version d'API Stripe épinglée à une année ancienne"
+    severity: info
+    patterns:
+      - "api_version[\"']?\\s*[:=]\\s*[\"']201[0-9]-"
+    fix_hint: "Épingler une version récente et tester la montée de version."
+    migration: "https://docs.stripe.com/upgrades"
+    since: "2026-09-27"
+
+  - id: twilio-basic-auth-url-credentials
+    provider: Twilio
+    title: "Identifiants Twilio en clair dans l'URL (AC…:token@)"
+    severity: warning
+    patterns:
+      - "https://AC[0-9a-f]{32}:[^@\\s\"']+@"
+    fix_hint: "Utiliser l'authentification HTTP Basic gérée par le SDK, jamais l'URL."
+    migration: "https://www.twilio.com/docs/iam/credentials/api"
+    since: "2026-09-27"
