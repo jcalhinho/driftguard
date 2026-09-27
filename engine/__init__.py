@@ -1,6 +1,6 @@
-"""DriftGuard — le « Dependabot des API ».
+"""DriftGuard — the "Dependabot for APIs".
 
-Moteur de détection des usages d'API cassants dans une codebase.
+Engine to detect breaking API usage in a codebase.
 """
 
 from .fixer import build_fix

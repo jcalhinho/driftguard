@@ -1,4 +1,4 @@
-"""Rapports de scan : texte lisible et JSON machine."""
+"""Scan reports: human-readable text and machine-readable JSON."""
 
 import json
 
@@ -37,7 +37,7 @@ def to_json(root, findings: list[Finding], files_scanned: int) -> str:
 def to_text(root, findings: list[Finding], files_scanned: int) -> str:
     lines = [
         f"🛡️ DriftGuard — {root}",
-        f"{files_scanned} fichier(s) scanné(s) · {len(findings)} usage(s) à risque",
+        f"{files_scanned} file(s) scanned · {len(findings)} at-risk usage(s)",
         "",
     ]
     current_file = None
@@ -45,7 +45,7 @@ def to_text(root, findings: list[Finding], files_scanned: int) -> str:
         if f.file != current_file:
             lines.append(f"📄 {f.file}")
             current_file = f.file
-        comment_note = " · dans un commentaire" if f.in_comment else ""
+        comment_note = " · inside a comment" if f.in_comment else ""
         lines.append(
             f"  {ICONS[f.rule.severity]} [{f.rule.severity:8}] L{f.line:<4} "
             f"{f.rule.title}{comment_note}"

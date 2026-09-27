@@ -1,4 +1,4 @@
-"""Service FastAPI DriftGuard : webhook GitHub → scan → issue/PR."""
+"""DriftGuard FastAPI service: GitHub webhook → scan → issue/PR."""
 
 import hashlib
 import hmac
@@ -44,7 +44,7 @@ def get_github_app() -> GitHubApp:
         if not app_id or not key_path:
             raise HTTPException(
                 status_code=500,
-                detail="GITHUB_APP_ID / GITHUB_APP_PRIVATE_KEY_PATH non configurés.",
+                detail="GITHUB_APP_ID / GITHUB_APP_PRIVATE_KEY_PATH are not configured.",
             )
         _gh_app = GitHubApp(int(app_id), Path(key_path).read_text())
     return _gh_app
@@ -69,7 +69,7 @@ async def webhook(request: Request):
     if secret and not verify_signature(
         body, request.headers.get("x-hub-signature-256", ""), secret
     ):
-        raise HTTPException(status_code=401, detail="Signature invalide.")
+        raise HTTPException(status_code=401, detail="Invalid signature.")
     if request.headers.get("x-github-event") == "ping":
         return {"ok": True}
 

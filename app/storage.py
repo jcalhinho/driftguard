@@ -1,4 +1,4 @@
-"""Stockage SQLite : installations, repos, findings déjà signalés (anti-doublons)."""
+"""SQLite storage: installations, repos, already-reported findings (dedup)."""
 
 import sqlite3
 import time

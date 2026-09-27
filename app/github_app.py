@@ -1,4 +1,4 @@
-"""Client GitHub App : JWT d'application, tokens d'installation, issues, PR (git data API)."""
+"""GitHub App client: app JWT, installation tokens, issues, PRs (git data API)."""
 
 import io
 import tarfile
@@ -37,7 +37,7 @@ class GitHubApp:
             f"{API}/app/installations/{installation_id}/access_tokens", headers=headers
         )
         if r.status_code != 201:
-            raise GitHubAppError(f"Échec du token d'installation : {r.status_code}")
+            raise GitHubAppError(f"Failed to get installation token: {r.status_code}")
         return r.json()["token"]
 
     async def _headers(self, installation_id: int) -> dict:
@@ -47,7 +47,7 @@ class GitHubApp:
             "Accept": "application/vnd.github+json",
         }
 
-    # --- Contenu du repo ---
+    # --- Repo content ---
 
     async def download_repo(
         self, installation_id: int, owner: str, repo: str, branch: str, dest_dir: Path
@@ -56,7 +56,7 @@ class GitHubApp:
         url = f"{API}/repos/{owner}/{repo}/tarball/{branch}"
         r = await self.transport.get(url, headers=headers, follow_redirects=True)
         if r.status_code != 200:
-            raise GitHubAppError(f"Téléchargement du repo impossible : {r.status_code}")
+            raise GitHubAppError(f"Failed to download repo: {r.status_code}")
         with tarfile.open(fileobj=io.BytesIO(r.content), mode="r:gz") as tar:
             members = [m for m in tar.getmembers() if m.isfile()]
             root_prefix = members[0].name.split("/")[0] + "/"
@@ -76,7 +76,7 @@ class GitHubApp:
         headers = await self._headers(installation_id)
         r = await self.transport.get(f"{API}/repos/{owner}/{repo}", headers=headers)
         if r.status_code != 200:
-            raise GitHubAppError(f"Repo introuvable : {r.status_code}")
+            raise GitHubAppError(f"Repo not found: {r.status_code}")
         return r.json().get("default_branch", "main")
 
     # --- Issues ---
@@ -91,7 +91,7 @@ class GitHubApp:
             json={"title": title, "body": body, "labels": ["driftguard"]},
         )
         if r.status_code not in (200, 201):
-            raise GitHubAppError(f"Création d'issue impossible : {r.status_code}")
+            raise GitHubAppError(f"Failed to create issue: {r.status_code}")
         return r.json()
 
     # --- Pull requests (via git data API) ---
@@ -112,7 +112,7 @@ class GitHubApp:
             f"{API}/repos/{owner}/{repo}/git/ref/heads/{base_branch}", headers=headers
         )
         if ref.status_code != 200:
-            raise GitHubAppError(f"Branche introuvable : {ref.status_code}")
+            raise GitHubAppError(f"Branch not found: {ref.status_code}")
         base_sha = ref.json()["object"]["sha"]
         tree_sha = base_sha
 
@@ -124,7 +124,7 @@ class GitHubApp:
                 json={"content": content, "encoding": "utf-8"},
             )
             if blob.status_code != 201:
-                raise GitHubAppError(f"Création de blob impossible : {blob.status_code}")
+                raise GitHubAppError(f"Failed to create blob: {blob.status_code}")
             blobs.append({"path": path, "sha": blob.json()["sha"], "mode": "100644", "type": "blob"})
 
         tree = await self.transport.post(
@@ -133,19 +133,19 @@ class GitHubApp:
             json={"base_tree": tree_sha, "tree": blobs},
         )
         if tree.status_code != 201:
-            raise GitHubAppError(f"Création d'arbre impossible : {tree.status_code}")
+            raise GitHubAppError(f"Failed to create tree: {tree.status_code}")
 
         commit = await self.transport.post(
             f"{API}/repos/{owner}/{repo}/git/commits",
             headers=headers,
             json={
-                "message": f"🛡️ DriftGuard : {title}",
+                "message": f"🛡️ DriftGuard: {title}",
                 "tree": tree.json()["sha"],
                 "parents": [base_sha],
             },
         )
         if commit.status_code != 201:
-            raise GitHubAppError(f"Création de commit impossible : {commit.status_code}")
+            raise GitHubAppError(f"Failed to create commit: {commit.status_code}")
 
         branch_name = f"driftguard/fixes-{int(time.time())}"
         new_ref = await self.transport.post(
@@ -154,7 +154,7 @@ class GitHubApp:
             json={"ref": f"refs/heads/{branch_name}", "sha": commit.json()["sha"]},
         )
         if new_ref.status_code != 201:
-            raise GitHubAppError(f"Création de branche impossible : {new_ref.status_code}")
+            raise GitHubAppError(f"Failed to create branch: {new_ref.status_code}")
 
         pr = await self.transport.post(
             f"{API}/repos/{owner}/{repo}/pulls",
@@ -162,5 +162,5 @@ class GitHubApp:
             json={"title": f"🛡️ {title}", "body": body, "head": branch_name, "base": base_branch},
         )
         if pr.status_code != 201:
-            raise GitHubAppError(f"Création de PR impossible : {pr.status_code}")
+            raise GitHubAppError(f"Failed to create PR: {pr.status_code}")
         return pr.json()

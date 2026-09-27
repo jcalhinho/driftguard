@@ -1,4 +1,4 @@
-"""Scan d'une codebase : détection des usages d'API selon les règles chargées."""
+"""Codebase scanning: detect API usage matching the loaded rules."""
 
 import os
 from dataclasses import dataclass
@@ -10,16 +10,16 @@ SKIP_DIRS = {
     ".git", "node_modules", ".venv", "venv", "env", "dist", "build", "out",
     "__pycache__", ".idea", ".vscode", ".driftguard", ".next", "vendor", "target",
 }
-MAX_FILE_SIZE = 2 * 1024 * 1024  # 2 Mo
+MAX_FILE_SIZE = 2 * 1024 * 1024  # 2 MB
 COMMENT_MARKERS = ("#", "//", "*", "/*", "<!--", "REM ")
 
 
 @dataclass
 class Finding:
     rule: Rule
-    file: str  # chemin relatif au dossier scanné
+    file: str  # path relative to the scanned directory
     line: int
-    context: str  # ligne concernée, nettoyée
+    context: str  # the matched line, stripped
     in_comment: bool
     match: str
 
@@ -30,7 +30,7 @@ def _is_comment_line(stripped: str) -> bool:
 
 
 def scan_repo(path, rules: list[Rule]) -> tuple[list[Finding], int]:
-    """Parcourt le dossier (lecture seule) et renvoie (findings, fichiers scannés)."""
+    """Walk the directory (read-only) and return (findings, scanned_files)."""
     root = Path(path)
     findings: list[Finding] = []
     files_scanned = 0
@@ -51,7 +51,7 @@ def scan_repo(path, rules: list[Rule]) -> tuple[list[Finding], int]:
             except OSError:
                 continue
             if b"\x00" in head:
-                continue  # binaire
+                continue  # binary file
             try:
                 text = full.read_text(encoding="utf-8", errors="replace")
             except OSError:

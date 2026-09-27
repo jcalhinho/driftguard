@@ -1,4 +1,4 @@
-"""Pipeline de scan : téléchargement → scan → rapport → issue ou PR (anti-doublons)."""
+"""Scan pipeline: download → scan → report → issue or PR (with dedup)."""
 
 import shutil
 import tempfile
@@ -15,7 +15,7 @@ from .github_app import GitHubApp
 
 DEFAULT_RULES = Path(__file__).resolve().parents[1] / "rules" / "rules.yaml"
 
-BRANDING = "\n\n---\n🛡️ Détecté par [DriftGuard](https://github.com/jcalhinho/driftguard) — le Dependabot des API."
+BRANDING = "\n\n---\n🛡️ Detected by [DriftGuard](https://github.com/jcalhinho/driftguard) — the Dependabot for APIs."
 
 
 def build_issue_body(repo: str, findings: list[Finding], files_scanned: int) -> str:
@@ -23,21 +23,21 @@ def build_issue_body(repo: str, findings: list[Finding], files_scanned: int) -> 
 
 
 def build_pr_body(findings: list[Finding]) -> str:
-    lines = ["## 🛡️ Corrections DriftGuard", ""]
+    lines = ["## 🛡️ DriftGuard fixes", ""]
     for f in findings:
         lines.append(f"- **[{f.rule.severity}] {f.rule.title}** — `{f.file}:{f.line}`")
         if f.rule.fix_hint:
             lines.append(f"  - {f.rule.fix_hint}")
         if f.rule.migration:
-            lines.append(f"  - Guide : {f.rule.migration}")
+            lines.append(f"  - Migration guide: {f.rule.migration}")
     lines.append(BRANDING)
     return "\n".join(lines)
 
 
 def apply_fixes(repo_dir: Path, findings: list[Finding]) -> list[tuple[str, str]]:
-    """Applique les remplacements mécaniques et renvoie [(chemin, nouveau contenu)].
+    """Apply mechanical replacements and return [(path, new_content)].
 
-    Appliqué de bas en haut (lignes décroissantes) pour préserver les numéros de ligne.
+    Applied bottom-up (descending lines) so line numbers stay valid.
     """
     by_file: dict[str, list[Finding]] = {}
     for f in findings:
@@ -67,7 +67,7 @@ async def run_scan_pipeline(
     owner: str,
     repo: str,
 ) -> dict:
-    """Pipeline complet : télécharge, scanne, déduplique, ouvre issue ou PR."""
+    """Full pipeline: download, scan, dedup, open an issue or a PR."""
     branch = await app.get_default_branch(installation_id, owner, repo)
     tmp = Path(tempfile.mkdtemp(prefix="driftguard-"))
     try:
@@ -91,21 +91,21 @@ async def run_scan_pipeline(
         if config.mode == "pr":
             changes = apply_fixes(tmp, new_findings)
             if not changes:
-                # Aucun correctif mécanique possible → repli sur l'issue.
+                # No safe mechanical fix available → fall back to an issue.
                 body = build_issue_body(full_name, new_findings, files_scanned)
-                title = f"[DriftGuard] {len(new_findings)} usage(s) d'API à risque"
+                title = f"[DriftGuard] {len(new_findings)} at-risk API usage(s)"
                 await app.create_issue(installation_id, owner, repo, title, body)
                 result = {"status": "issue_fallback", "findings": len(new_findings)}
             else:
                 body = build_pr_body(new_findings)
-                title = f"Corrections d'API cassantes ({len(new_findings)} usage(s))"
+                title = f"Fix breaking API usage ({len(new_findings)} usage(s))"
                 await app.create_pr(
                     installation_id, owner, repo, branch, changes, title, body
                 )
                 result = {"status": "pr_opened", "findings": len(new_findings)}
         else:
             body = build_issue_body(full_name, new_findings, files_scanned)
-            title = f"[DriftGuard] {len(new_findings)} usage(s) d'API à risque"
+            title = f"[DriftGuard] {len(new_findings)} at-risk API usage(s)"
             await app.create_issue(installation_id, owner, repo, title, body)
             result = {"status": "issue_opened", "findings": len(new_findings)}
 

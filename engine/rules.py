@@ -1,4 +1,4 @@
-"""Chargement et validation des règles de breaking changes d'API (YAML)."""
+"""Loading and validation of API breaking-change rules (YAML)."""
 
 import re
 from dataclasses import dataclass, field
@@ -29,7 +29,7 @@ class RulesError(Exception):
 
 
 def load_rules(path) -> list[Rule]:
-    """Charge et valide un fichier de règles YAML. Lève RulesError si invalide."""
+    """Load and validate a YAML rules file. Raises RulesError when invalid."""
     path = Path(path)
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     rules: list[Rule] = []
@@ -39,19 +39,19 @@ def load_rules(path) -> list[Rule]:
         rule_id = entry.get("id", "?")
         missing = [f for f in REQUIRED_FIELDS if f not in entry]
         if missing:
-            raise RulesError(f"Règle « {rule_id} » incomplète — champs manquants : {missing}")
+            raise RulesError(f"Rule '{rule_id}' is incomplete — missing fields: {missing}")
         if rule_id in seen_ids:
-            raise RulesError(f"id dupliqué : {rule_id}")
+            raise RulesError(f"Duplicate id: {rule_id}")
         if entry["severity"] not in VALID_SEVERITIES:
             raise RulesError(
-                f"Sévérité invalide pour « {rule_id} » : {entry['severity']} "
-                f"(attendu : {', '.join(VALID_SEVERITIES)})"
+                f"Invalid severity for '{rule_id}': {entry['severity']} "
+                f"(expected one of: {', '.join(VALID_SEVERITIES)})"
             )
         seen_ids.add(rule_id)
         try:
             compiled = [re.compile(p) for p in entry["patterns"]]
         except re.error as e:
-            raise RulesError(f"Regex invalide dans « {rule_id} » ({e.pattern}) : {e}")
+            raise RulesError(f"Invalid regex in '{rule_id}' ({e.pattern}): {e}")
 
         rules.append(
             Rule(

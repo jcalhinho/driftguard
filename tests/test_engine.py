@@ -156,7 +156,7 @@ def run_cli(*args):
 def test_cli_scan_text():
     result = run_cli("scan", str(FIXTURE))
     assert result.returncode == 1  # des findings → exit 1 (lisible en CI)
-    assert "usage(s) à risque" in result.stdout
+    assert "at-risk usage(s)" in result.stdout
 
 
 def test_cli_scan_json():

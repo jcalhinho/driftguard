@@ -1,8 +1,8 @@
-"""Génération de correctifs suggérés à partir d'un finding."""
+"""Suggested fix generation from a finding."""
 
 
 def build_fix(finding) -> dict:
-    """Renvoie un correctif : remplacement mécanique si la règle le permet, sinon manuel."""
+    """Return a fix: mechanical replacement when the rule allows it, otherwise manual."""
     rule = finding.rule
     for old, new in rule.replace.items():
         if old in finding.match:

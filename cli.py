@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""CLI DriftGuard.
+"""DriftGuard CLI.
 
-Usage :
-  driftguard scan ./mon-repo --format text|json [--min-severity warning] [--only Stripe]
+Usage:
+  driftguard scan ./my-repo --format text|json [--min-severity warning] [--only Stripe]
   driftguard rules
 """
 
@@ -21,25 +21,25 @@ SEVERITY_RANK = {"info": 0, "warning": 1, "critical": 2}
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="driftguard",
-        description="Détecte les usages d'API cassants dans ton code — le Dependabot des API.",
+        description="Detect breaking API usage in your code — the Dependabot for APIs.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    scan = sub.add_parser("scan", help="Scanner une codebase")
-    scan.add_argument("path", help="Chemin du dossier à scanner")
-    scan.add_argument("--rules", default=str(DEFAULT_RULES), help="Fichier de règles YAML")
+    scan = sub.add_parser("scan", help="Scan a codebase")
+    scan.add_argument("path", help="Path to the directory to scan")
+    scan.add_argument("--rules", default=str(DEFAULT_RULES), help="YAML rules file")
     scan.add_argument("--format", choices=["text", "json"], default="text")
     scan.add_argument("--min-severity", choices=list(SEVERITY_RANK), default="info")
-    scan.add_argument("--only", action="append", default=[], help="Filtrer par provider (répétable)")
+    scan.add_argument("--only", action="append", default=[], help="Filter by provider (repeatable)")
 
-    sub.add_parser("rules", help="Lister les règles chargées")
+    sub.add_parser("rules", help="List the loaded rules")
 
     args = parser.parse_args(argv)
 
     try:
         rules = load_rules(getattr(args, "rules", str(DEFAULT_RULES)))
     except RulesError as e:
-        print(f"❌ Erreur de règles : {e}", file=sys.stderr)
+        print(f"❌ Rules error: {e}", file=sys.stderr)
         return 2
 
     if args.command == "rules":
@@ -49,7 +49,7 @@ def main(argv=None) -> int:
 
     path = Path(args.path)
     if not path.is_dir():
-        print(f"❌ Chemin introuvable : {path}", file=sys.stderr)
+        print(f"❌ Path not found: {path}", file=sys.stderr)
         return 2
 
     findings, files_scanned = scan_repo(path, rules)
@@ -66,7 +66,7 @@ def main(argv=None) -> int:
     else:
         print(to_text(path, findings, files_scanned))
 
-    # Code de sortie lisible par une CI : 1 si au moins un usage trouvé.
+    # CI-friendly exit code: 1 when at least one usage was found.
     return 1 if findings else 0
 
 

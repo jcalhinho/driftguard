@@ -1,83 +1,83 @@
 # 🛡️ DriftGuard
 
-**Le « Dependabot des API »** — surveille les breaking changes des grandes API, scanne ton
-code, et ouvre automatiquement des pull requests correctives.
+**The "Dependabot for APIs"** — watches breaking changes from major APIs, scans your code,
+and automatically opens fix pull requests.
 
-> 30 % des temps d'arrêt d'AWS venaient de changements d'API non détectés. Dependabot gère
-> les dépendances — DriftGuard gère les API que ton code consomme.
+> 30% of AWS outages came from undetected API changes. Dependabot handles dependencies —
+> DriftGuard handles the APIs your code consumes.
 
-## Comment ça marche
+## How it works
 
-1. Stripe déprécie un endpoint → la base de règles DriftGuard l'apprend
-2. DriftGuard scanne ton repo, trouve les usages affectés (fichier + ligne exacte)
-3. DriftGuard ouvre une **issue** (défaut) ou une **PR corrective** (`.driftguard.yml` avec
-   `mode: pr`) : correctif + guide de migration officiel
-4. Tu merges en 5 minutes. Aucune rupture de prod.
+1. Stripe deprecates an endpoint → the DriftGuard rules base learns about it
+2. DriftGuard scans your repo and finds the affected usages (exact file + line)
+3. DriftGuard opens an **issue** (default) or a **fix PR** (`.driftguard.yml` with
+   `mode: pr`): fix + official migration guide
+4. You merge in 5 minutes. Zero production breakage.
 
-## Installation
+## Install
 
-**GitHub App** (gratuite pour les repos publics) : voir [SETUP.md](./SETUP.md) — création
-de l'app, déploiement VPS, installation sur tes repos en 2 clics.
+**GitHub App** (free for public repos): see [SETUP.md](./SETUP.md) — app creation,
+VPS deployment, install on your repos in 2 clicks.
 
-**CLI** (scan local en 2 minutes) :
+**CLI** (local scan in 2 minutes):
 
 ```bash
 pip install -e .
-driftguard scan ./mon-repo           # rapport texte
-driftguard scan ./mon-repo --format json --min-severity critical
-driftguard rules                     # liste les règles actives
+driftguard scan ./my-repo           # text report
+driftguard scan ./my-repo --format json --min-severity critical
+driftguard rules                    # list the active rules
 ```
 
-## Règles couvertes (13)
+## Rules covered (13)
 
-| Provider | Règle | Sévérité |
+| Provider | Rule | Severity |
 |---|---|---|
-| Stripe | API Charges dépréciée → Payment Intents | 🔴 critical |
-| Stripe | API Sources dépréciée → Payment Methods | 🟠 warning |
-| Stripe | Version d'API épinglée à une année ancienne | 🔵 info |
-| OpenAI | `text-davinci-003` / `code-davinci-002` retirés | 🔴 critical |
-| OpenAI | Endpoint legacy `/completions` en fin de vie | 🟠 warning |
-| GitHub | Flux OAuth par mot de passe désactivé | 🔴 critical |
-| GitHub | En-tête `Authorization: token` → Bearer | 🔵 info |
-| Slack | `rtm.start` déprécié → `rtm.connect` | 🟠 warning |
-| Slack | Tokens legacy (`xoxp-`/`xoxo-`) retirés | 🔴 critical |
-| Twilio | Lookups v1 dépréciée → v2 | 🟠 warning |
-| Twilio | Identifiants en clair dans l'URL | 🟠 warning |
-| SendGrid | API v2 (basic auth) retirée → v3 Bearer | 🟠 warning |
-| AWS | URLs S3 path-style dépréciées | 🔵 info |
+| Stripe | Charges API deprecated → Payment Intents | 🔴 critical |
+| Stripe | Sources API deprecated → Payment Methods | 🟠 warning |
+| Stripe | API version pinned to an old year | 🔵 info |
+| OpenAI | `text-davinci-003` / `code-davinci-002` shut down | 🔴 critical |
+| OpenAI | Legacy `/completions` endpoint phased out | 🟠 warning |
+| GitHub | OAuth password grant disabled | 🔴 critical |
+| GitHub | `Authorization: token` header → Bearer | 🔵 info |
+| Slack | `rtm.start` deprecated → `rtm.connect` | 🟠 warning |
+| Slack | Legacy tokens (`xoxp-`/`xoxo-`) retired | 🔴 critical |
+| Twilio | Lookups v1 deprecated → v2 | 🟠 warning |
+| Twilio | Plain-text credentials in the URL | 🟠 warning |
+| SendGrid | v2 API (basic auth) retired → v3 Bearer | 🟠 warning |
+| AWS | S3 path-style URLs deprecated | 🔵 info |
 
-Les règles sont du **YAML contribuable** : [CONTRIBUTING.md](./CONTRIBUTING.md) — 5 minutes
-par règle, c'est la communauté qui élargit la couverture.
+Rules are **contributable YAML**: see [CONTRIBUTING.md](./CONTRIBUTING.md) — 5 minutes per
+rule, the community expands the coverage.
 
-## Modèle
+## Model
 
-- **Open source (MIT)** : moteur, règles, CLI
-- **Gratuit** : repos publics, pour toujours
-- **Payant (à venir)** : repos privés / équipes — 49 €/mois par équipe
+- **Open source (MIT)**: engine, rules, CLI
+- **Free**: public repos, forever
+- **Paid (coming)**: private repos / teams — €49/month per team
 
 ## Structure
 
 ```
-engine/    # Moteur : scanner, règles, fixer, rapports (Python, testé)
-rules/     # Base de règles de breaking changes (YAML, contribuable)
-app/       # GitHub App : webhooks, JWT, issues, PR via git data API
-cli.py     # CLI : driftguard scan|rules
+engine/    # Engine: scanner, rules, fixer, reports (Python, tested)
+rules/     # Breaking-change rules base (YAML, contributable)
+app/       # GitHub App: webhooks, JWT, issues, PRs via the git data API
+cli.py     # CLI: driftguard scan|rules
 deploy/    # Docker + compose
-docs/      # Plan de lancement (LAUNCH.md)
-tests/     # 29 tests : moteur + app + CLI
+docs/      # Launch plan (LAUNCH.md)
+tests/     # 29 tests: engine + app + CLI
 ```
 
-## Qualité
+## Quality
 
-- ✅ 29 tests (pytest) : moteur, signature webhook, JWT, pipeline issue/PR, anti-doublons
-- ✅ Lint ruff, CI GitHub Actions
-- ✅ Anti-faux-positifs : mode issue par défaut, détection des commentaires,
-  anti-doublons SQLite, seuils de sévérité par repo
+- ✅ 29 tests (pytest): engine, webhook signature, JWT, issue/PR pipeline, dedup
+- ✅ Ruff lint, GitHub Actions CI
+- ✅ False-positive safety: issue mode by default, comment detection, SQLite dedup,
+  per-repo severity thresholds
 
 ## Roadmap
 
-- [x] **Phase 0** — Moteur + CLI + règles (terminé)
-- [x] **Phase 1** — GitHub App + PR automatiques (code terminé — reste la création de
-  l'app et le déploiement : voir SETUP.md)
-- [ ] **Phase 2** — Lancement public (voir docs/LAUNCH.md)
-- [ ] **Phase 3** — Tier payant + couverture élargie
+- [x] **Phase 0** — Engine + CLI + rules (done)
+- [x] **Phase 1** — GitHub App + automatic PRs (code done — app creation & deployment
+  remain: see SETUP.md)
+- [ ] **Phase 2** — Public launch (see docs/LAUNCH.md)
+- [ ] **Phase 3** — Paid tier + expanded coverage

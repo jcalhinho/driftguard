@@ -1,4 +1,4 @@
-"""Configuration par repo : fichier .driftguard.yml à la racine du repo scanné."""
+"""Per-repo configuration: a .driftguard.yml file at the repo root."""
 
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -6,7 +6,7 @@ from pathlib import Path
 import yaml
 
 DEFAULT_CONFIG = {
-    "mode": "issue",          # issue | pr
+    "mode": "issue",            # issue | pr
     "min_severity": "warning",  # info | warning | critical
     "ignore_rules": [],
     "only_providers": [],
@@ -24,7 +24,7 @@ class RepoConfig:
 
 
 def load_repo_config(repo_dir: Path) -> RepoConfig:
-    """Lit .driftguard.yml s'il existe, sinon renvoie la configuration par défaut."""
+    """Read .driftguard.yml when present, otherwise return the default config."""
     config_file = Path(repo_dir) / ".driftguard.yml"
     if not config_file.is_file():
         return RepoConfig(**DEFAULT_CONFIG)
@@ -38,7 +38,7 @@ def load_repo_config(repo_dir: Path) -> RepoConfig:
 
 
 def filter_findings(findings: list, config: RepoConfig) -> list:
-    """Applique min_severity, ignore_rules et only_providers."""
+    """Apply min_severity, ignore_rules and only_providers."""
     out = []
     for f in findings:
         if SEVERITY_RANK[f.rule.severity] < SEVERITY_RANK[config.min_severity]:
