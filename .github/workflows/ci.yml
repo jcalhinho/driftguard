@@ -11,7 +11,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Installer les dépendances
-        run: pip install -r requirements.txt -r requirements-dev.txt
+        run: pip install -r requirements.txt -r requirements-dev.txt -r app/requirements.txt -e .
       - name: Lint
         run: ruff check .
       - name: Tests
