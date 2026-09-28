@@ -6,7 +6,6 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
 
 from engine.rules import load_rules
 
@@ -15,13 +14,6 @@ from .github_app import GitHubApp, GitHubAppError
 from .pipeline import run_scan_pipeline
 
 app = FastAPI(title="DriftGuard", version="0.1.0")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 RULES_FILE = Path(os.getenv("DRIFTGUARD_RULES", str(Path(__file__).resolve().parents[1] / "rules" / "rules.yaml")))
 
@@ -65,8 +57,11 @@ async def health():
 @app.post("/webhook")
 async def webhook(request: Request):
     secret = os.getenv("GITHUB_WEBHOOK_SECRET", "")
+    if not secret:
+        # Fail closed: without a secret, anyone could forge push events.
+        raise HTTPException(status_code=503, detail="GITHUB_WEBHOOK_SECRET is not configured.")
     body = await request.body()
-    if secret and not verify_signature(
+    if not verify_signature(
         body, request.headers.get("x-hub-signature-256", ""), secret
     ):
         raise HTTPException(status_code=401, detail="Invalid signature.")

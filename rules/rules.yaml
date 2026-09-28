@@ -9,7 +9,9 @@
 # patterns:  regular expressions detecting the affected usage (one or more)
 # fix_hint:  remediation advice shown in the issue/PR
 # migration: link to the official migration guide
-# replace:   (optional) safe mechanical replacement mapping {old: new}
+# replace:   (optional) mechanical replacement mapping {old: new}. ONLY for strictly
+#            equivalent changes (same arguments, same response) — the fix is committed
+#            as-is in PR mode. When in doubt, leave it out: the finding becomes an issue.
 # since:     date the rule was introduced (YYYY-MM-DD)
 
 rules:
@@ -23,9 +25,6 @@ rules:
       - "charges/create"
     fix_hint: "Replace with stripe.paymentIntents.create() and follow the migration guide."
     migration: "https://docs.stripe.com/payments/payment-intents/migration"
-    replace:
-      "stripe.charges.create": "stripe.paymentIntents.create"
-      "stripe.charges.retrieve": "stripe.paymentIntents.retrieve"
     since: "2026-09-27"
 
   - id: stripe-sources-api-deprecated
@@ -66,6 +65,8 @@ rules:
     patterns:
       - "Authorization['\"]?\\s*[:=]\\s*['\"]?token\\s"
     fix_hint: "Use 'Authorization: Bearer <token>' instead."
+    replace:
+      "token ": "Bearer "
     migration: "https://github.blog/2021-04-05-behind-githubs-new-authentication-token-formats/"
     since: "2026-09-27"
 
@@ -77,8 +78,6 @@ rules:
       - "rtm\\.start"
     fix_hint: "Call rtm.connect, then open the returned WebSocket."
     migration: "https://api.slack.com/methods/rtm.connect"
-    replace:
-      "rtm.start": "rtm.connect"
     since: "2026-09-27"
 
   - id: slack-legacy-tokens

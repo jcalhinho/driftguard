@@ -18,6 +18,10 @@ DEFAULT_RULES = Path(__file__).resolve().parents[1] / "rules" / "rules.yaml"
 BRANDING = "\n\n---\n🛡️ Detected by [DriftGuard](https://github.com/jcalhinho/driftguard) — the Dependabot for APIs."
 
 
+def _fp(f: Finding) -> str:
+    return storage.fingerprint(f.context, f.match)
+
+
 def build_issue_body(repo: str, findings: list[Finding], files_scanned: int) -> str:
     return to_text(repo, findings, files_scanned) + BRANDING
 
@@ -37,7 +41,8 @@ def build_pr_body(findings: list[Finding]) -> str:
 def apply_fixes(repo_dir: Path, findings: list[Finding]) -> list[tuple[str, str]]:
     """Apply mechanical replacements and return [(path, new_content)].
 
-    Applied bottom-up (descending lines) so line numbers stay valid.
+    Files that are not valid UTF-8 are skipped (never rewritten lossily), and
+    original line endings are preserved so the PR diff only shows the fix.
     """
     by_file: dict[str, list[Finding]] = {}
     for f in findings:
@@ -49,14 +54,22 @@ def apply_fixes(repo_dir: Path, findings: list[Finding]) -> list[tuple[str, str]
         if not fixable:
             continue
         full = Path(repo_dir) / rel_path
-        text = full.read_text(encoding="utf-8", errors="replace")
-        lines = text.splitlines()
-        for f in sorted(fixable, key=lambda x: -x.line):
+        try:
+            with open(full, encoding="utf-8", newline="") as fh:
+                text = fh.read()
+        except (OSError, UnicodeDecodeError):
+            continue
+        lines = text.splitlines(keepends=True)
+        changed = False
+        for f in fixable:
             if 1 <= f.line <= len(lines):
                 fix = build_fix(f)
-                if fix["action"] == "replace" and fix["old"] in lines[f.line - 1]:
-                    lines[f.line - 1] = lines[f.line - 1].replace(fix["old"], fix["new"], 1)
-        changes.append((rel_path, "\n".join(lines) + ("\n" if text.endswith("\n") else "")))
+                line = lines[f.line - 1]
+                if fix["action"] == "replace" and fix["old"] in line:
+                    lines[f.line - 1] = line.replace(fix["old"], fix["new"], 1)
+                    changed = True
+        if changed:
+            changes.append((rel_path, "".join(lines)))
     return changes
 
 
@@ -78,14 +91,14 @@ async def run_scan_pipeline(
         if not findings:
             return {"status": "clean", "scanned": files_scanned}
 
+        full_name = f"{owner}/{repo}"
         new_findings = [
             f for f in findings
-            if not storage.already_reported(repo, f.rule.id, f.file, f.line)
+            if not storage.already_reported(full_name, f.rule.id, f.file, _fp(f))
         ]
         if not new_findings:
             return {"status": "already_reported", "scanned": files_scanned}
 
-        full_name = f"{owner}/{repo}"
         storage.touch_repo(full_name, installation_id)
 
         if config.mode == "pr":
@@ -110,7 +123,7 @@ async def run_scan_pipeline(
             result = {"status": "issue_opened", "findings": len(new_findings)}
 
         for f in new_findings:
-            storage.mark_reported(repo, f.rule.id, f.file, f.line)
+            storage.mark_reported(full_name, f.rule.id, f.file, _fp(f))
         return result
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

@@ -1,5 +1,6 @@
 """SQLite storage: installations, repos, already-reported findings (dedup)."""
 
+import hashlib
 import os
 import sqlite3
 import time
@@ -20,12 +21,21 @@ def _conn() -> sqlite3.Connection:
         "CREATE TABLE IF NOT EXISTS repos ("
         "full_name TEXT PRIMARY KEY, installation_id INTEGER, last_scan_at REAL)"
     )
+    # Keyed on the full repo name and a fingerprint of the matched code, not the
+    # line number: inserting lines above a finding must not re-report it.
+    # (Replaces the legacy `reported` table, which was keyed on (name, line).)
     conn.execute(
-        "CREATE TABLE IF NOT EXISTS reported ("
-        "repo TEXT, rule_id TEXT, file TEXT, line INTEGER, reported_at REAL, "
-        "PRIMARY KEY (repo, rule_id, file, line))"
+        "CREATE TABLE IF NOT EXISTS reported_findings ("
+        "repo TEXT, rule_id TEXT, file TEXT, fingerprint TEXT, reported_at REAL, "
+        "PRIMARY KEY (repo, rule_id, file, fingerprint))"
     )
     return conn
+
+
+def fingerprint(context: str, match: str) -> str:
+    """Stable identity of a finding, independent of its line number."""
+    normalized = " ".join(context.split()) + "\0" + match
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:32]
 
 
 def save_installation(installation_id: int, account: str):
@@ -49,22 +59,24 @@ def touch_repo(full_name: str, installation_id: int):
     conn.close()
 
 
-def already_reported(repo: str, rule_id: str, file: str, line: int) -> bool:
+def already_reported(repo: str, rule_id: str, file: str, fp: str) -> bool:
+    """`repo` must be the full name (owner/repo)."""
     conn = _conn()
     row = conn.execute(
-        "SELECT 1 FROM reported WHERE repo = ? AND rule_id = ? AND file = ? AND line = ?",
-        (repo, rule_id, file, line),
+        "SELECT 1 FROM reported_findings "
+        "WHERE repo = ? AND rule_id = ? AND file = ? AND fingerprint = ?",
+        (repo, rule_id, file, fp),
     ).fetchone()
     conn.close()
     return row is not None
 
 
-def mark_reported(repo: str, rule_id: str, file: str, line: int):
+def mark_reported(repo: str, rule_id: str, file: str, fp: str):
     conn = _conn()
     conn.execute(
-        "INSERT OR REPLACE INTO reported (repo, rule_id, file, line, reported_at) "
-        "VALUES (?, ?, ?, ?, ?)",
-        (repo, rule_id, file, line, time.time()),
+        "INSERT OR REPLACE INTO reported_findings "
+        "(repo, rule_id, file, fingerprint, reported_at) VALUES (?, ?, ?, ?, ?)",
+        (repo, rule_id, file, fp, time.time()),
     )
     conn.commit()
     conn.close()

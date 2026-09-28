@@ -1,6 +1,5 @@
 """Tests de la GitHub App : signature webhook, config repo, pipeline complet (mocké)."""
 
-import json
 from pathlib import Path
 
 import pytest
@@ -134,14 +133,49 @@ def test_pipeline_dedup(tmp_path, monkeypatch):
     assert len(fake.issues) == 1
 
 
+def test_pipeline_dedup_survives_line_shift(tmp_path, monkeypatch):
+    from app import storage
+    monkeypatch.setattr(storage, "DB_PATH", tmp_path / "test.sqlite")
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    (repo_dir / "pay.py").write_text("stripe.charges.create(1)\n", encoding="utf-8")
+    rules = load_rules(RULES_FILE)
+    fake = FakeGitHubApp(repo_dir)
+
+    import asyncio
+    asyncio.run(run_scan_pipeline(fake, rules, 1, "owner", "repo"))
+    # Lines inserted above the finding: same usage, must not be re-reported.
+    (repo_dir / "pay.py").write_text(
+        "import stripe\n\n\nstripe.charges.create(1)\n", encoding="utf-8"
+    )
+    result = asyncio.run(run_scan_pipeline(fake, rules, 1, "owner", "repo"))
+    assert result["status"] == "already_reported"
+    assert len(fake.issues) == 1
+
+
+def test_pipeline_dedup_scoped_by_owner(tmp_path, monkeypatch):
+    from app import storage
+    monkeypatch.setattr(storage, "DB_PATH", tmp_path / "test.sqlite")
+    rules = load_rules(RULES_FILE)
+    fake = FakeGitHubApp(FIXTURE)
+
+    import asyncio
+    asyncio.run(run_scan_pipeline(fake, rules, 1, "alice", "api"))
+    # Same repo name, different owner: must get its own issue.
+    result = asyncio.run(run_scan_pipeline(fake, rules, 2, "bob", "api"))
+    assert result["status"] == "issue_opened"
+    assert len(fake.issues) == 2
+
+
 def test_pipeline_pr_mode(tmp_path, monkeypatch):
     from app import storage
     monkeypatch.setattr(storage, "DB_PATH", tmp_path / "test.sqlite")
     repo_dir = tmp_path / "repo"
     repo_dir.mkdir()
-    import shutil
-    shutil.copytree(FIXTURE, repo_dir, dirs_exist_ok=True)
-    (repo_dir / ".driftguard.yml").write_text("mode: pr\nmin_severity: warning\n", encoding="utf-8")
+    (repo_dir / "gh.py").write_text(
+        "headers = {'Authorization': 'token ghp_x'}\n", encoding="utf-8"
+    )
+    (repo_dir / ".driftguard.yml").write_text("mode: pr\nmin_severity: info\n", encoding="utf-8")
 
     rules = load_rules(RULES_FILE)
     fake = FakeGitHubApp(repo_dir)
@@ -149,9 +183,24 @@ def test_pipeline_pr_mode(tmp_path, monkeypatch):
     result = asyncio.run(run_scan_pipeline(fake, rules, 1, "owner", "repo"))
     assert result["status"] == "pr_opened"
     assert len(fake.prs) == 1
-    # Les corrections remplacent stripe.charges → paymentIntents
-    changes_text = json.dumps(fake.prs[0]["changes"])
-    assert "paymentIntents" in changes_text
+    assert fake.prs[0]["changes"] == [("gh.py", "headers = {'Authorization': 'Bearer ghp_x'}\n")]
+
+
+def test_pipeline_pr_mode_falls_back_to_issue(tmp_path, monkeypatch):
+    # Stripe Charges has no safe mechanical fix → an issue, never a broken PR.
+    from app import storage
+    monkeypatch.setattr(storage, "DB_PATH", tmp_path / "test.sqlite")
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    (repo_dir / "pay.py").write_text("stripe.charges.create(1)\n", encoding="utf-8")
+    (repo_dir / ".driftguard.yml").write_text("mode: pr\n", encoding="utf-8")
+
+    rules = load_rules(RULES_FILE)
+    fake = FakeGitHubApp(repo_dir)
+    import asyncio
+    result = asyncio.run(run_scan_pipeline(fake, rules, 1, "owner", "repo"))
+    assert result["status"] == "issue_fallback"
+    assert fake.prs == []
 
 
 def test_apply_fixes(tmp_path):
@@ -159,13 +208,61 @@ def test_apply_fixes(tmp_path):
     repo = tmp_path / "repo"
     repo.mkdir()
     (repo / "app.py").write_text(
-        "stripe.charges.create(1)\nkeep = 1\nstripe.charges.retrieve('x')\n", encoding="utf-8"
+        "a = {'Authorization': 'token x'}\nkeep = 1\nb = {'Authorization': 'token y'}\n",
+        encoding="utf-8",
     )
     findings, _ = scan_repo(repo, rules)
     changes = apply_fixes(repo, findings)
-    assert len(changes) == 1
-    path, content = changes[0]
-    assert path == "app.py"
-    assert "paymentIntents.create" in content
-    assert "paymentIntents.retrieve" in content
-    assert "keep = 1" in content
+    assert changes == [
+        ("app.py", "a = {'Authorization': 'Bearer x'}\nkeep = 1\nb = {'Authorization': 'Bearer y'}\n")
+    ]
+
+
+def test_apply_fixes_preserves_crlf(tmp_path):
+    rules = load_rules(RULES_FILE)
+    (tmp_path / "app.py").write_bytes(b"keep = 1\r\nh = {'Authorization': 'token x'}\r\n")
+    findings, _ = scan_repo(tmp_path, rules)
+    [(_, content)] = apply_fixes(tmp_path, findings)
+    assert content == "keep = 1\r\nh = {'Authorization': 'Bearer x'}\r\n"
+
+
+def test_apply_fixes_skips_non_utf8(tmp_path):
+    rules = load_rules(RULES_FILE)
+    (tmp_path / "app.py").write_bytes(b"# caf\xe9\nh = {'Authorization': 'token x'}\n")
+    findings, _ = scan_repo(tmp_path, rules)
+    assert findings  # detected…
+    assert apply_fixes(tmp_path, findings) == []  # …but never rewritten lossily
+
+
+# ---------- Webhook endpoint ----------
+
+def _client():
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+    return TestClient(app)
+
+
+def test_webhook_refuses_when_secret_missing(monkeypatch):
+    monkeypatch.delenv("GITHUB_WEBHOOK_SECRET", raising=False)
+    r = _client().post("/webhook", content=b"{}", headers={"x-github-event": "push"})
+    assert r.status_code == 503
+
+
+def test_webhook_rejects_unsigned_request(monkeypatch):
+    monkeypatch.setenv("GITHUB_WEBHOOK_SECRET", "s3cret")
+    r = _client().post("/webhook", content=b"{}", headers={"x-github-event": "push"})
+    assert r.status_code == 401
+
+
+def test_webhook_accepts_signed_ping(monkeypatch):
+    import hashlib
+    import hmac
+    monkeypatch.setenv("GITHUB_WEBHOOK_SECRET", "s3cret")
+    body = b"{}"
+    sig = "sha256=" + hmac.new(b"s3cret", body, hashlib.sha256).hexdigest()
+    r = _client().post(
+        "/webhook", content=body,
+        headers={"x-github-event": "ping", "x-hub-signature-256": sig},
+    )
+    assert r.status_code == 200

@@ -14,8 +14,7 @@ detection. Writing a rule takes 5 minutes.
     - "stripe\\.charges\\.create"
   fix_hint: "Replace with stripe.paymentIntents.create()."
   migration: "https://docs.stripe.com/payments/payment-intents/migration"
-  replace:                               # optional: safe mechanical replacement
-    "stripe.charges.create": "stripe.paymentIntents.create"
+  # no `replace`: Payment Intents takes different arguments, so it is not a drop-in fix
   since: "2026-09-27"
 ```
 
@@ -26,8 +25,10 @@ detection. Writing a rule takes 5 minutes.
 2. **A precise pattern** — it must match the real usage without matching anything else.
    Test it against `tests/fixtures/sample_repo/` by adding your case.
 3. **An actionable fix_hint** — what the developer should do, in one sentence.
-4. **`replace` only when safe** — an unambiguous mechanical replacement; otherwise,
-   omit it (issue mode takes care of it).
+4. **`replace` only when strictly equivalent** — same arguments, same response (e.g.
+   `Authorization: token` → `Bearer`). It is committed as-is in PR mode, so a rename to
+   an API with a different signature (Charges → PaymentIntents, rtm.start → rtm.connect)
+   does NOT qualify: omit it and the finding is reported as an issue.
 
 ## Process
 

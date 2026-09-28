@@ -1,0 +1,20 @@
+# Secrets — must never end up in the image (mounted at runtime instead)
+*.pem
+*.p12
+**/.env
+**/*.sqlite
+**/*.db
+
+# Local / build artifacts
+.git
+.github
+.venv
+venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+*.egg-info
+bench
+tests
+docs

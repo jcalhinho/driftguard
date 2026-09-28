@@ -106,15 +106,23 @@ def test_scan_skips_git_dir(tmp_path):
 
 # ---------- Fixer ----------
 
-def test_fixer_replace(scan_result):
-    findings, _ = scan_result
-    target = next(
-        f for f in findings if f.rule.id == "stripe-charges-api-deprecated"
-        and "create" in f.match
+def test_fixer_replace(tmp_path):
+    rules = load_rules(RULES_FILE)
+    (tmp_path / "gh.py").write_text(
+        "headers = {'Authorization': 'token ghp_x'}\n", encoding="utf-8"
     )
+    findings, _ = scan_repo(tmp_path, rules)
+    target = next(f for f in findings if f.rule.id == "github-auth-token-header")
     fix = build_fix(target)
     assert fix["action"] == "replace"
-    assert "paymentIntents.create" in fix["new"]
+    assert "Bearer " in fix["new"]
+
+
+def test_fixer_no_unsafe_replacement(scan_result):
+    # Charges → PaymentIntents is not a drop-in change: it must stay manual.
+    findings, _ = scan_result
+    target = next(f for f in findings if f.rule.id == "stripe-charges-api-deprecated")
+    assert build_fix(target)["action"] == "manual"
 
 
 def test_fixer_manual(scan_result):
