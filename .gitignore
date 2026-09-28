@@ -8,3 +8,9 @@ venv/
 .driftguard/
 dist/
 build/
+
+# Secrets GitHub App — ne JAMAIS committer
+*.pem
+*.p12
+*-key.pem
+driftguard-key.pem
