@@ -89,5 +89,5 @@ sudo systemctl reload caddy
 
 ## 6. Install the app on a repo
 
-GitHub App settings → **Install App** → pick a public repo → push anything →
+GitHub App settings → **Install App** → pick a repo → push anything →
 the log shows the scan → an issue appears on the repo. 🎉

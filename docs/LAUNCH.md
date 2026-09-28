@@ -24,14 +24,14 @@ Goal: 30+ GitHub App installs, 100+ stars, first quality feedback.
 
 **Show HN:**
 > Show HN: DriftGuard — the Dependabot for APIs. It watches breaking changes from
-> Stripe, GitHub, Slack & OpenAI, scans your repos, and opens fix PRs. Free for public
-> repos. YC's latest RFS asked for exactly this — I built the open-source core.
+> OpenAI, Anthropic, Google, GitHub Actions, Stripe, Slack, AWS…, scans your repos, and
+> opens an issue (or a fix PR) with the migration guide. Free for everyone, open source.
 
 **r/webdev:**
-> 30% of AWS outages came from undetected API changes. Dependabot handles packages,
-> nothing handles APIs — so I built DriftGuard: it scans your code for deprecated API
-> usage (stripe.charges, text-davinci-003, legacy Slack tokens…) and opens a PR with
-> the fix + migration link. Free for public repos, rules are open YAML.
+> Dependabot handles packages, nothing handles the APIs your code calls — so I built
+> DriftGuard: it finds retired models (gpt-4-32k, claude-3-opus…), removed endpoints
+> (Slack files.upload, Assistants API) and dead CI runners, with the official migration
+> link. One line in a workflow, free for everyone, 53 rules as open YAML.
 
 **Product Hunt tagline:**
 > Your code breaks when APIs change. DriftGuard finds it before your users do.

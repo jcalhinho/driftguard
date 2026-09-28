@@ -163,9 +163,8 @@ tests/             # pytest suite (engine, every rule, app, CLI)
 
 ## Pricing
 
-- **Open source (MIT)**: engine, rules, CLI, Action
-- **GitHub App**: free for public repositories
-- **Private repositories / teams**: coming soon
+Free for everyone — public and private repositories, individuals and teams. The engine,
+rules, CLI and Action are open source (MIT).
 
 ## Development
 

@@ -51,7 +51,7 @@ docker compose -f deploy/docker-compose.yml up -d --build
 
 ## 5. Install the app on a repo
 
-On github.com: **Settings → GitHub Apps → DriftGuard → Install** → pick a public repo.
+On github.com: **Settings → GitHub Apps → DriftGuard → Install** → pick the repos (public or private).
 DriftGuard scans every selected repo right away, then on each push to the default branch.
 It opens an issue (or a PR if the repo has `.driftguard.yml` with `mode: pr` and a safe
 fix exists). Repos added to the installation later are scanned when added.

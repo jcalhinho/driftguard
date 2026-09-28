@@ -1,8 +1,8 @@
 # DriftGuard — Execution plan (v1)
 
 > **The "Dependabot for APIs"**: an agent that watches breaking changes from major APIs,
-> scans users' code, and automatically opens fix pull requests. Open source, free for
-> public repos, paid for private repos.
+> scans users' code, and automatically opens fix pull requests. Open source and free
+> for everyone, private repos included.
 
 Plan date: 2026-09-27 · Author: jcalhinho · Status: phases 0-1 code complete
 
@@ -43,20 +43,14 @@ Plan date: 2026-09-27 · Author: jcalhinho · Status: phases 0-1 code complete
 | Semgrep, CodeQL | Generic scanning — no "API breaking changes" base |
 | **DriftGuard** | **API breaking changes, consumer side — the empty niche** |
 
-## 3. Business model (open core)
+## 3. Business model
 
-- **Free forever**: open-source engine (MIT), free GitHub App for public repos.
-- **Paid (phase 3)**: private repos and teams — €49/month per team (~€19/repo/month).
-- Reference: Renovate's model (free OSS + paid hosting) and Dependabot pricing.
+**Free for everyone** (decided 2026-09-28): public and private repos, individuals and
+teams. Engine, rules, CLI and Action are open source (MIT); the hosted GitHub App is free.
 
-### Honest revenue scenarios
-
-| Scenario | Paying teams | MRR | Yearly |
-|---|---|---|---|
-| Adoption failure | 0–5 | ~€0 | €0 (the repo remains a portfolio asset) |
-| Worked distribution (3 months) | 30–50 | €1,500–2,500 | €18–30k |
-| Dev word-of-mouth | 200 | ~€10k | ~€120k |
-| Niche leader | 1,000+ | €50k+ | €600k+ or acquisition (Snyk/GitHub/Datadog) |
+The goal is adoption and reputation, not revenue: the value is in the rules base and the
+community around it. Running cost stays ~€0 (GCP e2-micro free tier) as long as usage
+fits on one instance — revisit hosting (not pricing) if it outgrows it.
 
 ## 4. Technical architecture
 
@@ -126,16 +120,15 @@ driftguard/
 > README with rules table. Execution starts once the GitHub App runs in prod — these
 > are actions on YOUR accounts (Reddit, HN, PH).
 
-### Phase 3 — Growth & monetization (W5–12)
-- [x] Paid tier groundwork: private repos, teams (€49/month)
+### Phase 3 — Growth (W5–12)
+- [x] Free for all repos, private included (no paid tier)
 - [x] Coverage: OpenAI, Twilio, SendGrid, AWS (the most-used ones)
 - [x] Community rule contribution (the moat engine)
 - [x] Self-hosted for enterprises
 
 > ✅ **Phase 3 groundwork laid 2026-09-27**: 13 rules (Stripe, OpenAI, GitHub, Slack,
 > Twilio, SendGrid, AWS), `CONTRIBUTING.md` (rule contribution process, acceptance
-> criteria, CI), open-core model documented in the README. Billing itself (Stripe)
-> activates after the first installs.
+> criteria, CI), free-for-everyone model documented in the README.
 
 ## 6. Success KPIs
 
