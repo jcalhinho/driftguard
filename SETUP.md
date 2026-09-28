@@ -1,70 +1,70 @@
-# 🛠️ Setup — mettre DriftGuard en service (30 minutes)
+# 🛠️ Setup — running DriftGuard as a service (30 minutes)
 
-Deux étapes manuelles (impossibles à automatiser pour toi) : **créer la GitHub App**
-et **déployer le service**. Tout le reste est déjà codé.
+Two manual steps (impossible to automate for you): **create the GitHub App** and
+**deploy the service**. Everything else is already coded.
 
-## 1. Créer la GitHub App (github.com)
+## 1. Create the GitHub App (github.com)
 
 1. **GitHub → Settings → Developer settings → GitHub Apps → New GitHub App**
-2. Nom : `DriftGuard` — Homepage URL : l'URL de ton repo
-3. **Webhook URL** : `https://TON-DOMAINE/webhook` (ou une URL smee.io pendant les tests locaux)
-4. **Webhook secret** : génère un secret long (et mets-le dans `.env`)
-5. **Permissions** (Repository) :
-   - `Contents` → **Read & write** (pour les PR correctives)
+2. Name: `DriftGuard` — Homepage URL: your repo URL
+3. **Webhook URL**: `https://YOUR-DOMAIN/webhook` (or a smee.io URL for local testing)
+4. **Webhook secret**: generate a long secret (and put it in `.env`)
+5. **Permissions** (Repository):
+   - `Contents` → **Read & write** (for fix PRs)
    - `Pull requests` → **Read & write**
    - `Issues` → **Read & write**
-   - `Metadata` → Read-only (par défaut)
-6. **Events à souscrire** : `Push`, `Pull request`, `Installation`
-7. Créer l'app → noter l'**App ID** → **Generate a private key** (télécharge le `.pem`)
+   - `Metadata` → Read-only (default)
+6. **Events to subscribe**: `Push`, `Pull request`, `Installation`
+7. Create the app → note the **App ID** → **Generate a private key** (download the `.pem`)
 
-## 2. Configurer le service
+## 2. Configure the service
 
 ```bash
 cd app
 cp .env.example .env
-# Renseigner GITHUB_APP_ID, GITHUB_WEBHOOK_SECRET
-cp ../deploy/driftguard-key.pem .   # la clé privée téléchargée
+# Fill GITHUB_APP_ID and GITHUB_WEBHOOK_SECRET
+cp ../deploy/driftguard-key.pem .   # the downloaded private key
 ```
 
-## 3. Lancer (développement)
+## 3. Run (development)
 
 ```bash
 cd driftguard
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt -r app/requirements.txt -e .
 set -a && source app/.env && set +a
 .venv/bin/uvicorn app.main:app --port 8000
-# Test : curl http://localhost:8000/health
+# Test: curl http://localhost:8000/health
 ```
 
-## 4. Lancer (production, VPS + Docker)
+## 4. Run (production, VPS + Docker)
 
 ```bash
-# Sur ton VPS : clone du repo, puis
+# On your VPS: clone the repo, then
 cd deploy
 export GITHUB_APP_ID=123456 GITHUB_WEBHOOK_SECRET=...
 docker compose up -d --build
-# Derrière un reverse proxy (nginx/caddy) avec HTTPS vers localhost:8000
+# Behind a reverse proxy (nginx/caddy) with HTTPS to localhost:8000
 ```
 
-## 5. Installer l'app sur un repo
+## 5. Install the app on a repo
 
-Sur github.com : **Settings → GitHub Apps → DriftGuard → Install** → choisis un repo public.
-Dès le prochain push, DriftGuard scanne et ouvre une issue (ou une PR si le repo a
-`.driftguard.yml` avec `mode: pr`).
+On github.com: **Settings → GitHub Apps → DriftGuard → Install** → pick a public repo.
+On the next push, DriftGuard scans and opens an issue (or a PR if the repo has
+`.driftguard.yml` with `mode: pr`).
 
-## 6. Configuration par repo (.driftguard.yml à la racine du repo)
+## 6. Per-repo configuration (.driftguard.yml at the repo root)
 
 ```yaml
-mode: issue            # issue (défaut) | pr
+mode: issue            # issue (default) | pr
 min_severity: warning  # info | warning | critical
 ignore_rules:
   - slack-legacy-tokens
-only_providers:        # optionnel : restreindre à certains fournisseurs
+only_providers:        # optional: restrict to specific providers
   - Stripe
 ```
 
-## Dépannage
+## Troubleshooting
 
-- `Signature invalide` → le secret du webhook ne correspond pas à celui de `.env`
-- `Échec du token d'installation` → clé privée ou App ID erronés
-- Le webhook ne reçoit rien → vérifier l'URL publique (smee/ngrok en local)
+- `Invalid signature` → the webhook secret doesn't match `.env`
+- `Failed to get installation token` → wrong private key or App ID
+- Webhook receives nothing → check the public URL (smee/ngrok when local)

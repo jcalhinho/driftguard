@@ -1,170 +1,164 @@
-# DriftGuard — Plan d'exécution (v1)
+# DriftGuard — Execution plan (v1)
 
-> **Le « Dependabot des API »** : un agent qui surveille les breaking changes des grandes
-> API, scanne le code de ses utilisateurs, et ouvre automatiquement des pull requests
-> correctives. Open source, gratuit pour les repos publics, payant pour les repos privés.
+> **The "Dependabot for APIs"**: an agent that watches breaking changes from major APIs,
+> scans users' code, and automatically opens fix pull requests. Open source, free for
+> public repos, paid for private repos.
 
-Date du plan : 2026-09-27 · Auteur : jcalhinho · Statut : phase 0
+Plan date: 2026-09-27 · Author: jcalhinho · Status: phases 0-1 code complete
 
 ---
 
-## 1. Le problème (chiffré)
+## 1. The problem (with numbers)
 
-- **30 % des temps d'arrêt d'AWS** provenaient de changements d'API/paquets non détectés (source : YC RFS).
-- Dependabot/Renovate gèrent les **dépendances** depuis 10 ans — personne ne fait l'équivalent pour les **API**.
-- Un breaking change d'API se découvre aujourd'hui **en production**, par les erreurs clients.
-- La demande est **explicite et écrite** dans le Request for Startups de Y Combinator (automne 2026) :
-  « quand un fournisseur publie un changement cassant, un agent devrait scanner les codebases
-  clients et ouvrir une PR avec le correctif — un Dependabot pour les API ».
+- **30% of AWS outages** came from undetected API/package changes (source: YC RFS).
+- Dependabot/Renovate have handled **dependencies** for 10 years — nobody does the
+  equivalent for **APIs**.
+- Today, an API breaking change is discovered **in production**, through customer errors.
+- The demand is **explicit and written** in Y Combinator's Request for Startups
+  (Fall 2026): "when a provider publishes a breaking change, an agent should scan client
+  codebases and open a PR with the fix — a Dependabot for APIs".
 
-## 2. Le produit
+## 2. The product
 
-### Exemple de parcours utilisateur (Stripe, 2019, cas réel)
+### Example user journey (Stripe, 2019, real case)
 
-1. Stripe déprécie `stripe.charges.create()` → Payment Intents.
-2. DriftGuard détecte le changement via sa base de règles, scanne les repos installés,
-   trouve `stripe.charges.create(` dans 14 fichiers.
-3. DriftGuard ouvre **une PR par impact** : correctif + lien vers le guide de migration.
-4. L'équipe merge en 5 minutes. Aucune rupture de prod.
+1. Stripe deprecates `stripe.charges.create()` → Payment Intents.
+2. DriftGuard learns the change through its rules base, scans installed repos,
+   finds `stripe.charges.create(` in 14 files.
+3. DriftGuard opens **one PR per impact**: fix + migration guide link.
+4. The team merges in 5 minutes. Zero production breakage.
 
-### Ce que DriftGuard n'est PAS
+### What DriftGuard is NOT
 
-- Pas un linter générique (Semgrep/CodeQL font ça).
-- Pas un outil de gestion de changements pour les fournisseurs d'API (Optic/Bump.sh font ça).
-- C'est la **couche consommateur** : du côté des équipes qui *utilisent* les API.
+- Not a generic linter (Semgrep/CodeQL do that).
+- Not a change-management tool for API providers (Optic/Bump.sh do that).
+- It's the **consumer layer**: for teams that *use* APIs.
 
-### Positionnement concurrentiel (honnête)
+### Honest competitive positioning
 
-| Acteur | Couvre |
+| Player | Covers |
 |---|---|
-| Dependabot, Renovate | Versions de dépendances — pas les API |
-| Optic, Bump.sh | Changements d'API **côté fournisseur** |
-| Semgrep, CodeQL | Scan générique — pas de base « breaking changes API » |
-| **DriftGuard** | **Breaking changes d'API, côté consommateur — le créneau vide** |
+| Dependabot, Renovate | Dependency versions — not APIs |
+| Optic, Bump.sh | API changes **on the provider side** |
+| Semgrep, CodeQL | Generic scanning — no "API breaking changes" base |
+| **DriftGuard** | **API breaking changes, consumer side — the empty niche** |
 
-## 3. Le modèle économique (open core)
+## 3. Business model (open core)
 
-- **Gratuit pour toujours** : moteur open source (MIT), GitHub App gratuite pour les repos publics.
-- **Payant (phase 3)** : repos privés et équipes — 49 €/mois par équipe (~19 €/repo/mois).
-- Référence : le modèle Renovate (OSS gratuit + hébergement payant) et la tarification Dependabot.
+- **Free forever**: open-source engine (MIT), free GitHub App for public repos.
+- **Paid (phase 3)**: private repos and teams — €49/month per team (~€19/repo/month).
+- Reference: Renovate's model (free OSS + paid hosting) and Dependabot pricing.
 
-### Scénarios de revenus (honnêtes)
+### Honest revenue scenarios
 
-| Scénario | Équipes payantes | MRR | Annuel |
+| Scenario | Paying teams | MRR | Yearly |
 |---|---|---|---|
-| Échec d'adoption | 0–5 | ~0 € | 0 € (le repo reste un atout portfolio) |
-| Distribution travaillée (3 mois) | 30–50 | 1 500–2 500 € | 18–30 k€ |
-| Bouche-à-oreille dev | 200 | ~10 k€ | ~120 k€ |
-| Leader du créneau | 1 000+ | 50 k€+ | 600 k€+ ou rachat (Snyk/GitHub/Datadog) |
+| Adoption failure | 0–5 | ~€0 | €0 (the repo remains a portfolio asset) |
+| Worked distribution (3 months) | 30–50 | €1,500–2,500 | €18–30k |
+| Dev word-of-mouth | 200 | ~€10k | ~€120k |
+| Niche leader | 1,000+ | €50k+ | €600k+ or acquisition (Snyk/GitHub/Datadog) |
 
-## 4. Architecture technique
+## 4. Technical architecture
 
 ```
 driftguard/
-├── engine/              # Moteur open source (Python)
-│   ├── scanner.py       # Scan d'une codebase : usages d'API (regex + contexte)
-│   ├── rules.py         # Chargement/validation des règles YAML
-│   ├── fixer.py         # Génération du patch correctif
-│   └── tests/           # Fixtures de repos + tests unitaires
-├── rules/               # LA moat : base de règles de breaking changes (YAML, contribuable)
-│   ├── stripe.yaml      # charges → payment_intents, sk_test en prod, etc.
-│   ├── github.yaml      # Endpoints dépréciés, tokens d'API...
-│   └── slack.yaml
-├── app/                 # Service FastAPI + GitHub App (webhooks, scan, PR)
-│   ├── main.py
-│   ├── github_app.py    # Auth app (JWT), installation tokens, PR via API REST
-│   └── storage.py       # SQLite : installations, repos, historique des scans
-├── cli/                 # CLI : driftguard scan ./mon-repo (usage local, porte d'entrée OSS)
-├── .github/workflows/   # CI : tests + lint à chaque push
+├── engine/              # Open-source engine (Python)
+│   ├── scanner.py       # Codebase scan: API usage (regex + context)
+│   ├── rules.py         # YAML rules loading/validation
+│   ├── fixer.py         # Fix patch generation
+│   └── tests/           # Fixture repos + unit tests
+├── rules/               # THE moat: breaking-change rules base (YAML, contributable)
+├── app/                 # FastAPI service + GitHub App (webhooks, scan, PR)
+├── cli/                 # CLI: driftguard scan ./my-repo
+├── bench/               # Rust scanner benchmark (performance experiment)
+├── .github/workflows/   # CI: tests + lint on every push
 ├── PLAN.md
-└── README.md            # Lancement : démo, install, règles supportées
+└── README.md
 ```
 
-### Décisions techniques
+### Technical decisions
 
-| Sujet | Décision | Justification |
+| Topic | Decision | Rationale |
 |---|---|---|
-| Langage moteur | Python 3.12+ | Vitesse de dev, écosystème regex/AST, déjà maîtrisé |
-| Format des règles | YAML | Lisible, contribuable — la communauté peut écrire des règles (la moat) |
-| Détection | Regex + contexte (pas d'AST complet) | 80 % des usages d'API se détectent par pattern + lignes voisines ; simple et robuste |
-| GitHub App (pas OAuth) | App avec permissions minimales (Contents, Pull requests) | Installation par repo, tokens par installation, 5 000 req/h |
-| Stratégie anti-faux-positifs | Mode **Issue** par défaut, mode **PR** opt-in | La confiance est le produit : on n'ouvre une PR que si la confiance est haute |
-| Déploiement | VPS 5 €/mois + Docker | Maîtrisé, suffisant pour 10 000 repos |
-| Règles v1 | Stripe, GitHub, Slack (10–15 règles réelles) | Commencer étroit, élargir ensuite (OpenAI, Twilio, SendGrid, AWS) |
+| Engine language | Python 3.10+ | Dev speed, regex/AST ecosystem, already mastered |
+| Rules format | YAML | Readable, contributable — the community can write rules (the moat) |
+| Detection | Regex + context (no full AST) | 80% of API usage is detected by pattern + neighboring lines; simple and robust |
+| GitHub App (not OAuth) | App with minimal permissions (Contents, Pull requests) | Per-repo install, per-installation tokens, 5,000 req/h |
+| Anti-false-positive strategy | **Issue** mode by default, **PR** mode opt-in | Trust is the product: a PR is opened only with high confidence |
+| Deployment | €5/month VPS + Docker | Mastered, enough for 10,000 repos |
+| v1 rules | Stripe, GitHub, Slack (10–15 real rules) | Start narrow, expand later (OpenAI, Twilio, SendGrid, AWS) |
 
-## 5. Roadmap (12 semaines)
+## 5. Roadmap (12 weeks)
 
-### Phase 0 — Fondations (S1 : 29/09 → 05/10)
-- [x] Repo open source `driftguard` (MIT) + README + CI (tests + lint)
-- [x] Moteur : scanner de codebase (usages d'API par pattern + contexte)
-- [x] Format de règles YAML + 5 règles Stripe réelles
-- [x] CLI `driftguard scan ./repo` avec sortie JSON/rapport
-- [x] Tests unitaires sur repo fixture (14 usages → détections exactes)
+### Phase 0 — Foundations (W1)
+- [x] Open-source repo `driftguard` (MIT) + README + CI (tests + lint)
+- [x] Engine: codebase scanner (API usage by pattern + context)
+- [x] YAML rules format + real Stripe rules
+- [x] CLI `driftguard scan ./repo` with JSON/report output
+- [x] Unit tests on fixture repo (exact detections)
 
-> ✅ **Phase 0 terminée le 2026-09-27** : 8 règles réelles (Stripe, OpenAI, GitHub, Slack,
-> Twilio), moteur + CLI + fixer + rapports text/JSON, 19 tests verts, lint ruff propre,
-> CI configurée. Le CLI détecte 8/8 usages de la fixture avec lignes exactes, drapeau
-> commentaire, hints de correction et liens de migration.
+> ✅ **Phase 0 done 2026-09-27**: engine + CLI + fixer + text/JSON reports, 29 tests
+> green, clean ruff lint, CI configured. The CLI detects 8/8 fixture usages with exact
+> lines, comment flag, fix hints and migration links.
 
-### Phase 1 — GitHub App (S2–3 : 06/10 → 19/10)
-- [x] GitHub App : installation, webhooks (push, PR), scan automatique
-- [x] Ouverture de PR correctives (correctif + lien de migration)
-- [x] Mode Issue (défaut) / mode PR (opt-in) + badge DriftGuard dans le message
-- [x] SQLite : installations, repos, historique
-- [ ] Déploiement VPS + tests réels sur 3 repos (dont les nôtres)
+### Phase 1 — GitHub App (W2–3)
+- [x] GitHub App: installation, webhooks (push, PR), automatic scan
+- [x] Fix PR opening (fix + migration link)
+- [x] Issue mode (default) / PR mode (opt-in)
+- [x] SQLite: installations, repos, history
+- [ ] VPS deployment + real tests on 3 repos
 
-> ✅ **Code de la phase 1 terminé le 2026-09-27** : `app/github_app.py` (JWT RS256,
-> tokens d'installation, download tarball, issues, PR via git data API blob/tree/commit/ref),
-> `app/pipeline.py` (scan → dédup SQLite → issue ou PR avec correctifs mécaniques),
-> `app/main.py` (webhook avec signature HMAC, événements ping/installation/push/PR),
-> `app/config.py` (.driftguard.yml par repo : mode, seuil, règles ignorées), Docker +
-> compose. Testé : 29 tests dont pipeline complet avec GitHub mocké (issue, PR, dédup),
-> webhook simulé en local (health/ping/installation OK). **Reste action humaine** :
-> créer la GitHub App sur github.com + déployer (SETUP.md, 30 min).
+> ✅ **Phase 1 code done 2026-09-27**: `app/github_app.py` (RS256 JWT, installation
+> tokens, tarball download, issues, PRs via git data API), `app/pipeline.py`
+> (scan → SQLite dedup → issue or PR with mechanical fixes), `app/main.py` (HMAC-signed
+> webhook, ping/installation/push/PR events), `app/config.py` (.driftguard.yml per repo),
+> Docker + compose. Tested: 29 tests including the full pipeline with a mocked GitHub
+> (issue, PR, dedup), local webhook simulation OK. **Remaining human actions**: create
+> the GitHub App on github.com + deploy (SETUP.md, 30 min).
 
-### Phase 2 — Lancement public (S4 : 20/10 → 26/10)
-- [ ] Beta sur 10 repos amis → itération sur les faux positifs
-- [ ] Exécution du lancement : r/webdev, Show HN, Product Hunt
-- [ ] KPI mis en place : installs, PRs mergées, étoiles
+### Phase 2 — Public launch (W4)
+- [ ] Beta on 10 friend repos → false-positive iteration
+- [ ] Launch execution: r/webdev, Show HN, Product Hunt
+- [ ] KPIs in place: installs, merged PRs, stars
 
-> ✅ **Matériel de la phase 2 prêt (2026-09-27)** : `docs/LAUNCH.md` avec séquence
-> J-2→J14, pitchs prêts à coller (Show HN, r/webdev, Product Hunt), checklist beta,
-> README de lancement avec tableau des règles. L'exécution démarre quand la GitHub App
-> tourne en prod (phase 1) — ce sont des actions sur TES comptes (Reddit, HN, PH).
+> ✅ **Phase 2 material ready 2026-09-27**: `docs/LAUNCH.md` with D-2→D14 sequence,
+> ready-to-paste pitches (Show HN, r/webdev, Product Hunt), beta checklist, launch
+> README with rules table. Execution starts once the GitHub App runs in prod — these
+> are actions on YOUR accounts (Reddit, HN, PH).
 
-### Phase 3 — Croissance & monétisation (S5–12)
-- [x] Tier payant : repos privés, équipes (49 €/mois)
-- [x] Couverture : OpenAI, Twilio, SendGrid, AWS SDK (les plus utilisés)
-- [x] Contribution communautaire aux règles (le moteur de la moat)
-- [x] Self-hosted pour entreprises
+### Phase 3 — Growth & monetization (W5–12)
+- [x] Paid tier groundwork: private repos, teams (€49/month)
+- [x] Coverage: OpenAI, Twilio, SendGrid, AWS (the most-used ones)
+- [x] Community rule contribution (the moat engine)
+- [x] Self-hosted for enterprises
 
-> ✅ **Socle de la phase 3 posé (2026-09-27)** : 13 règles (Stripe, OpenAI, GitHub,
-> Slack, Twilio, SendGrid, AWS), `CONTRIBUTING.md` (process de contribution aux règles,
-> critères d'acceptation, CI), modèle open core documenté dans le README. La
-> monétisation elle-même (Stripe, facturation) s'active après les premiers installs.
+> ✅ **Phase 3 groundwork laid 2026-09-27**: 13 rules (Stripe, OpenAI, GitHub, Slack,
+> Twilio, SendGrid, AWS), `CONTRIBUTING.md` (rule contribution process, acceptance
+> criteria, CI), open-core model documented in the README. Billing itself (Stripe)
+> activates after the first installs.
 
-## 6. KPI du succès
+## 6. Success KPIs
 
-| Étape | KPI |
+| Milestone | KPI |
 |---|---|
-| Fin S1 | CLI qui détecte 100 % des usages du repo fixture |
-| Fin S3 | PR auto ouverte et mergée sur un vrai repo |
-| Fin S4 | 30+ installs de la GitHub App |
-| Fin S8 | 500+ repos scannés, 10 PRs mergées par semaine |
-| Fin S12 | Premiers clients payants (3+) |
+| End of W1 | CLI detects 100% of fixture usages |
+| End of W3 | Auto PR opened and merged on a real repo |
+| End of W4 | 30+ GitHub App installs |
+| End of W8 | 500+ scanned repos, 10 merged PRs/week |
+| End of W12 | First paying customers (3+) |
 
-## 7. Risques & parades
+## 7. Risks & mitigations
 
-| Risque | Parade |
+| Risk | Mitigation |
 |---|---|
-| La base de règles est le vrai travail (curation des changelogs) | Format YAML contribuable + règles vérifiées par la communauté ; couverture étroite au début |
-| Faux positifs → perte de confiance | Mode Issue par défaut, seuils conservateurs, PR opt-in |
-| Concurrence (Snyk, GitHub, Sourcegraph) | Vitesse + communauté de règles ; le créneau est déclaré vide par YC |
-| Revenus lents (B2B dev tools) | Open core : l'adoption passe par le gratuit ; runway 6 mois de revenus persos |
+| The rules base is the real work (changelog curation) | Contributable YAML format + community-verified rules; narrow coverage at first |
+| False positives → lost trust | Issue mode by default, conservative thresholds, opt-in PRs |
+| Competition (Snyk, GitHub, Sourcegraph) | Speed + rule community; the niche is declared empty by YC |
+| Slow revenue (B2B dev tools) | Open core: adoption flows through the free tier; 6-month personal runway |
 
-## 8. Ce qui rend le projet réaliste pour un solo builder
+## 8. Why this is realistic for a solo builder
 
-- Le scan de code est **déjà maîtrisé** (mode repo d'AegisScan, même famille technique).
-- L'API GitHub est **déjà maîtrisée** (GitVibe, jobs, webhooks).
-- Pas d'audience requise : **le GitHub Marketplace est l'audience**.
-- La boucle de croissance est intégrée au produit : chaque PR ouverte porte le nom DriftGuard.
+- Code scanning is **already mastered** (AegisScan repo mode, same technical family).
+- The GitHub API is **already mastered** (GitVibe, jobs, webhooks).
+- No audience required: **the GitHub Marketplace is the audience**.
+- The growth loop is built into the product: every opened PR carries the DriftGuard name.

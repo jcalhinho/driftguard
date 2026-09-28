@@ -62,6 +62,7 @@ engine/    # Engine: scanner, rules, fixer, reports (Python, tested)
 rules/     # Breaking-change rules base (YAML, contributable)
 app/       # GitHub App: webhooks, JWT, issues, PRs via the git data API
 cli.py     # CLI: driftguard scan|rules
+bench/     # Rust scanner benchmark (identical detections, ~3x faster on 12k files)
 deploy/    # Docker + compose
 docs/      # Launch plan (LAUNCH.md)
 tests/     # 29 tests: engine + app + CLI

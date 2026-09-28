@@ -1,0 +1,127 @@
+[
+  {
+    "id": "stripe-charges-api-deprecated",
+    "provider": "Stripe",
+    "title": "The Charges API is deprecated — use Payment Intents",
+    "severity": "critical",
+    "patterns": [
+      "stripe\\.charges\\.create",
+      "stripe\\.charges\\.retrieve",
+      "charges/create"
+    ]
+  },
+  {
+    "id": "stripe-sources-api-deprecated",
+    "provider": "Stripe",
+    "title": "The Sources API is deprecated",
+    "severity": "warning",
+    "patterns": [
+      "stripe\\.sources\\.create"
+    ]
+  },
+  {
+    "id": "openai-text-davinci-003-shutdown",
+    "provider": "OpenAI",
+    "title": "The text-davinci-003 model has been shut down",
+    "severity": "critical",
+    "patterns": [
+      "text-davinci-003",
+      "code-davinci-002"
+    ]
+  },
+  {
+    "id": "github-oauth-password-grant",
+    "provider": "GitHub",
+    "title": "The OAuth password grant flow is disabled",
+    "severity": "critical",
+    "patterns": [
+      "access_token\\?[^\"'\\s]*grant_type=password"
+    ]
+  },
+  {
+    "id": "github-auth-token-header",
+    "provider": "GitHub",
+    "title": "The 'Authorization: token' header is deprecated in favor of Bearer",
+    "severity": "info",
+    "patterns": [
+      "Authorization['\"]?\\s*[:=]\\s*['\"]?token\\s"
+    ]
+  },
+  {
+    "id": "slack-rtm-start-deprecated",
+    "provider": "Slack",
+    "title": "rtm.start is deprecated — use rtm.connect",
+    "severity": "warning",
+    "patterns": [
+      "rtm\\.start"
+    ]
+  },
+  {
+    "id": "slack-legacy-tokens",
+    "provider": "Slack",
+    "title": "Legacy tokens (xoxp-/xoxo-) have been retired",
+    "severity": "critical",
+    "patterns": [
+      "xoxp-[A-Za-z0-9-]+",
+      "xoxo-[A-Za-z0-9-]+"
+    ]
+  },
+  {
+    "id": "twilio-lookups-v1-deprecated",
+    "provider": "Twilio",
+    "title": "Lookups v1 API is deprecated in favor of v2",
+    "severity": "warning",
+    "patterns": [
+      "/v1/PhoneNumbers",
+      "lookups\\.v1"
+    ]
+  },
+  {
+    "id": "openai-legacy-completions-endpoint",
+    "provider": "OpenAI",
+    "title": "The legacy /completions endpoint is being phased out",
+    "severity": "warning",
+    "patterns": [
+      "openai\\.completions\\.create",
+      "openai\\.Completion\\.create"
+    ]
+  },
+  {
+    "id": "sendgrid-apikey-basic-auth",
+    "provider": "SendGrid",
+    "title": "The v2 API (basic auth 'apikey') has been retired — use v3 Bearer",
+    "severity": "warning",
+    "patterns": [
+      "v2/mail/send",
+      "sendgrid\\./v2"
+    ]
+  },
+  {
+    "id": "aws-s3-path-style-deprecated",
+    "provider": "AWS",
+    "title": "S3 path-style URLs are deprecated",
+    "severity": "info",
+    "patterns": [
+      "https://s3\\.amazonaws\\.com/",
+      "https://[a-z0-9-]+\\.s3\\.amazonaws\\.com/"
+    ]
+  },
+  {
+    "id": "stripe-pinned-old-api-version",
+    "provider": "Stripe",
+    "title": "Stripe API version pinned to an old year",
+    "severity": "info",
+    "patterns": [
+      "api_version[\"']?\\s*[:=]\\s*[\"']201[0-9]-"
+    ]
+  },
+  {
+    "id": "twilio-basic-auth-url-credentials",
+    "provider": "Twilio",
+    "title": "Twilio credentials in plain text inside the URL (AC…:token@)",
+    "severity": "warning",
+    "patterns": [
+      "https://AC[0-9a-f]{32}:[^@\\s\"']+@"
+    ]
+  }
+]

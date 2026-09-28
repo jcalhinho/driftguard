@@ -1,0 +1,15 @@
+[package]
+name = "driftguard-rust"
+version = "0.1.0"
+edition = "2021"
+description = "Rust scanner benchmark for DriftGuard (the Dependabot for APIs)"
+
+[dependencies]
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+walkdir = "2"
+
+[profile.release]
+lto = true
+codegen-units = 1
