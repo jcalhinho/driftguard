@@ -1,11 +1,14 @@
 """DriftGuard FastAPI service: GitHub webhook → scan → issue/PR."""
 
+import asyncio
 import hashlib
 import hmac
+import logging
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 
 from driftguard.rules import DEFAULT_RULES_FILE, load_rules
 
@@ -13,7 +16,9 @@ from . import storage
 from .github_app import GitHubApp, GitHubAppError
 from .pipeline import run_scan_pipeline
 
-app = FastAPI(title="DriftGuard", version="0.1.0")
+log = logging.getLogger("driftguard")
+
+app = FastAPI(title="DriftGuard", version="0.2.0")
 
 RULES_FILE = Path(os.getenv("DRIFTGUARD_RULES", str(DEFAULT_RULES_FILE)))
 
@@ -42,6 +47,26 @@ def get_github_app() -> GitHubApp:
     return _gh_app
 
 
+# One scan at a time per repo: two quick pushes must not open two identical issues.
+_repo_locks: dict[str, asyncio.Lock] = {}
+
+
+async def scan_in_background(
+    installation_id: int, owner: str, repo: str, branch: str | None = None
+):
+    lock = _repo_locks.setdefault(f"{owner}/{repo}", asyncio.Lock())
+    async with lock:
+        try:
+            result = await run_scan_pipeline(
+                get_github_app(), get_rules(), installation_id, owner, repo, branch
+            )
+            log.info("scan %s/%s: %s", owner, repo, result)
+        except GitHubAppError as e:
+            log.warning("scan %s/%s failed: %s", owner, repo, e)
+        except Exception:
+            log.exception("scan %s/%s crashed", owner, repo)
+
+
 def verify_signature(payload: bytes, signature: str, secret: str) -> bool:
     if not signature or not signature.startswith("sha256="):
         return False
@@ -54,8 +79,12 @@ async def health():
     return {"status": "ok", "rules": len(get_rules())}
 
 
+def _queued(scans: int) -> JSONResponse:
+    return JSONResponse({"ok": True, "queued": scans}, status_code=202)
+
+
 @app.post("/webhook")
-async def webhook(request: Request):
+async def webhook(request: Request, tasks: BackgroundTasks):
     secret = os.getenv("GITHUB_WEBHOOK_SECRET", "")
     if not secret:
         # Fail closed: without a secret, anyone could forge push events.
@@ -65,34 +94,55 @@ async def webhook(request: Request):
         body, request.headers.get("x-hub-signature-256", ""), secret
     ):
         raise HTTPException(status_code=401, detail="Invalid signature.")
-    if request.headers.get("x-github-event") == "ping":
+    event = request.headers.get("x-github-event", "")
+    if event == "ping":
         return {"ok": True}
 
     payload = await request.json()
-    event = request.headers.get("x-github-event", "")
+    installation = payload.get("installation") or {}
+    installation_id = int(installation.get("id", 0))
+    action = payload.get("action", "")
 
     if event == "installation":
-        action = payload.get("action", "")
-        installation = payload.get("installation", {})
-        account = (installation.get("account") or {}).get("login", "?")
-        if action in ("created", "suspend", "unsuspend"):
-            storage.save_installation(int(installation.get("id", 0)), account)
-        return {"ok": True}
+        account = (installation.get("account") or {}).get("login", "")
+        if action == "deleted":
+            storage.delete_installation(installation_id)
+            return {"ok": True}
+        if action != "created":
+            return {"ok": True, "skipped": f"installation.{action}"}
+        storage.save_installation(installation_id, account)
+        # First impression: scan every repo right away instead of waiting for a push.
+        return _schedule_repos(tasks, installation_id, payload.get("repositories") or [])
 
-    if event in ("push", "pull_request"):
-        installation_id = int((payload.get("installation") or {}).get("id", 0))
+    if event == "installation_repositories":
+        if action != "added":
+            return {"ok": True, "skipped": f"installation_repositories.{action}"}
+        return _schedule_repos(tasks, installation_id, payload.get("repositories_added") or [])
+
+    if event == "push":
         repo_data = payload.get("repository") or {}
         owner = (repo_data.get("owner") or {}).get("login", "")
         repo = repo_data.get("name", "")
+        branch = repo_data.get("default_branch", "")
         if not installation_id or not owner or not repo:
-            return {"ok": True, "skipped": "infos manquantes"}
-        gh = get_github_app()
-        try:
-            result = await run_scan_pipeline(
-                gh, get_rules(), installation_id, owner, repo
-            )
-        except GitHubAppError as e:
-            raise HTTPException(status_code=502, detail=str(e))
-        return {"ok": True, **result}
+            return {"ok": True, "skipped": "missing repository info"}
+        # Only the default branch is scanned; feature branches (and DriftGuard's own
+        # fix branches) would only produce noise.
+        if payload.get("deleted") or payload.get("ref") != f"refs/heads/{branch}":
+            return {"ok": True, "skipped": "not the default branch"}
+        get_github_app()  # surface misconfiguration in the webhook delivery log
+        tasks.add_task(scan_in_background, installation_id, owner, repo, branch)
+        return _queued(1)
 
     return {"ok": True, "skipped": event}
+
+
+def _schedule_repos(tasks: BackgroundTasks, installation_id: int, repos: list) -> JSONResponse:
+    get_github_app()
+    count = 0
+    for r in repos:
+        owner, _, name = (r.get("full_name") or "").partition("/")
+        if owner and name:
+            tasks.add_task(scan_in_background, installation_id, owner, name)
+            count += 1
+    return _queued(count)

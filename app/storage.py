@@ -48,6 +48,21 @@ def save_installation(installation_id: int, account: str):
     conn.close()
 
 
+def delete_installation(installation_id: int):
+    """App uninstalled: forget the installation, its repos and their history."""
+    conn = _conn()
+    repos = [
+        r[0] for r in conn.execute(
+            "SELECT full_name FROM repos WHERE installation_id = ?", (installation_id,)
+        )
+    ]
+    conn.executemany("DELETE FROM reported_findings WHERE repo = ?", [(r,) for r in repos])
+    conn.execute("DELETE FROM repos WHERE installation_id = ?", (installation_id,))
+    conn.execute("DELETE FROM installations WHERE id = ?", (installation_id,))
+    conn.commit()
+    conn.close()
+
+
 def touch_repo(full_name: str, installation_id: int):
     conn = _conn()
     conn.execute(

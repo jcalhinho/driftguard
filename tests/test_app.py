@@ -1,5 +1,6 @@
 """Tests de la GitHub App : signature webhook, config repo, pipeline complet (mocké)."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -266,3 +267,148 @@ def test_webhook_accepts_signed_ping(monkeypatch):
         headers={"x-github-event": "ping", "x-hub-signature-256": sig},
     )
     assert r.status_code == 200
+
+
+# ---------- Webhook events → background scans ----------
+
+def _signed_post(client, event, payload):
+    import hashlib
+    import hmac
+    body = json.dumps(payload).encode()
+    sig = "sha256=" + hmac.new(b"s3cret", body, hashlib.sha256).hexdigest()
+    return client.post(
+        "/webhook", content=body,
+        headers={"x-github-event": event, "x-hub-signature-256": sig},
+    )
+
+
+@pytest.fixture
+def webhook_env(monkeypatch, tmp_path):
+    """Signed webhook client whose scans are recorded instead of executed."""
+    from app import main, storage
+    monkeypatch.setenv("GITHUB_WEBHOOK_SECRET", "s3cret")
+    monkeypatch.setattr(storage, "DB_PATH", tmp_path / "test.sqlite")
+    monkeypatch.setattr(main, "get_github_app", lambda: object())
+    calls = []
+
+    async def fake_pipeline(gh, rules, installation_id, owner, repo, branch=None):
+        calls.append((installation_id, owner, repo, branch))
+        return {"status": "clean"}
+
+    monkeypatch.setattr(main, "run_scan_pipeline", fake_pipeline)
+    return _client(), calls
+
+
+PUSH = {
+    "ref": "refs/heads/main",
+    "installation": {"id": 7},
+    "repository": {"name": "api", "owner": {"login": "alice"}, "default_branch": "main"},
+}
+
+
+def test_push_to_default_branch_is_scanned_in_background(webhook_env):
+    client, calls = webhook_env
+    r = _signed_post(client, "push", PUSH)
+    assert r.status_code == 202
+    assert calls == [(7, "alice", "api", "main")]
+
+
+def test_push_to_other_branch_is_ignored(webhook_env):
+    client, calls = webhook_env
+    r = _signed_post(client, "push", {**PUSH, "ref": "refs/heads/driftguard/fixes-1"})
+    assert r.status_code == 200
+    assert calls == []
+
+
+def test_pull_request_event_is_ignored(webhook_env):
+    client, calls = webhook_env
+    _signed_post(client, "pull_request", {**PUSH, "action": "labeled"})
+    assert calls == []
+
+
+def test_install_scans_every_repo(webhook_env):
+    client, calls = webhook_env
+    r = _signed_post(client, "installation", {
+        "action": "created",
+        "installation": {"id": 7, "account": {"login": "alice"}},
+        "repositories": [{"full_name": "alice/api"}, {"full_name": "alice/web"}],
+    })
+    assert r.status_code == 202
+    assert calls == [(7, "alice", "api", None), (7, "alice", "web", None)]
+
+
+def test_repos_added_to_installation_are_scanned(webhook_env):
+    client, calls = webhook_env
+    _signed_post(client, "installation_repositories", {
+        "action": "added",
+        "installation": {"id": 7},
+        "repositories_added": [{"full_name": "alice/new"}],
+    })
+    assert calls == [(7, "alice", "new", None)]
+
+
+def test_uninstall_forgets_history(webhook_env):
+    import sqlite3
+
+    from app import storage
+    client, _ = webhook_env
+    storage.save_installation(7, "alice")
+    storage.touch_repo("alice/api", 7)
+    storage.mark_reported("alice/api", "rule", "a.py", "fp")
+    _signed_post(client, "installation", {"action": "deleted", "installation": {"id": 7}})
+    conn = sqlite3.connect(storage.DB_PATH)
+    assert conn.execute("SELECT COUNT(*) FROM reported_findings").fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM installations").fetchone()[0] == 0
+
+
+# ---------- GitHub client: tokens and tarball ----------
+
+def test_installation_token_is_cached():
+    import asyncio
+
+    import httpx
+
+    hits = []
+
+    def handler(request):
+        hits.append(request.url.path)
+        return httpx.Response(201, json={"token": "t", "expires_at": "2999-01-01T00:00:00Z"})
+
+    gh = GitHubApp(1, "unused", transport=httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+    gh.app_token = lambda: "jwt"
+    asyncio.run(gh.installation_token(5))
+    asyncio.run(gh.installation_token(5))
+    assert len(hits) == 1
+
+
+def _tarball(entries):
+    import io
+    import tarfile
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        for name, data in entries:
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            tar.addfile(info, io.BytesIO(data))
+    buf.seek(0)
+    return buf
+
+
+def test_extract_tarball_strips_root_and_blocks_traversal(tmp_path):
+    from app.github_app import _extract_tarball
+    dest = tmp_path / "dest"
+    dest.mkdir()
+    _extract_tarball(_tarball([
+        ("owner-repo-abc/src/app.py", b"print(1)"),
+        ("owner-repo-abc/../../escape.txt", b"pwned"),
+    ]), dest)
+    assert (dest / "src" / "app.py").read_bytes() == b"print(1)"
+    assert not (tmp_path / "escape.txt").exists()
+    assert not any(p.name == "escape.txt" for p in tmp_path.rglob("*"))
+
+
+def test_extract_tarball_size_limit(tmp_path, monkeypatch):
+    from app import github_app
+    monkeypatch.setattr(github_app, "MAX_EXTRACTED_BYTES", 10)
+    with pytest.raises(github_app.GitHubAppError):
+        github_app._extract_tarball(_tarball([("r/big.txt", b"x" * 100)]), tmp_path)

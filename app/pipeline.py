@@ -1,5 +1,6 @@
 """Scan pipeline: download → scan → report → issue or PR (with dedup)."""
 
+import asyncio
 import shutil
 import tempfile
 from pathlib import Path
@@ -77,14 +78,17 @@ async def run_scan_pipeline(
     installation_id: int,
     owner: str,
     repo: str,
+    branch: str | None = None,
 ) -> dict:
     """Full pipeline: download, scan, dedup, open an issue or a PR."""
-    branch = await app.get_default_branch(installation_id, owner, repo)
+    if not branch:
+        branch = await app.get_default_branch(installation_id, owner, repo)
     tmp = Path(tempfile.mkdtemp(prefix="driftguard-"))
     try:
         await app.download_repo(installation_id, owner, repo, branch, tmp)
         config = load_repo_config(tmp)
-        findings, files_scanned = scan_repo(tmp, rules)
+        # CPU-bound: keep the event loop free for incoming webhooks.
+        findings, files_scanned = await asyncio.to_thread(scan_repo, tmp, rules)
         findings = filter_findings(findings, config)
         if not findings:
             return {"status": "clean", "scanned": files_scanned}
