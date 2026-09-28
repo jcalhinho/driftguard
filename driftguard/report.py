@@ -57,3 +57,31 @@ def to_text(root, findings: list[Finding], files_scanned: int) -> str:
             lines.append(f"         🔗 {f.rule.migration}")
     lines.append("")
     return "\n".join(lines)
+
+
+GITHUB_LEVELS = {"critical": "error", "warning": "warning", "info": "notice"}
+
+
+def _gh_escape(value: str, prop: bool = False) -> str:
+    value = value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+    if prop:
+        value = value.replace(":", "%3A").replace(",", "%2C")
+    return value
+
+
+def to_github(root, findings: list[Finding], files_scanned: int) -> str:
+    """GitHub Actions workflow commands: one inline annotation per finding."""
+    prefix = str(root).rstrip("/")
+    out = []
+    for f in findings:
+        file = f.file if prefix in ("", ".") else f"{prefix}/{f.file}"
+        message = f.rule.fix_hint or f.rule.title
+        if f.rule.migration:
+            message += f"\nMigration guide: {f.rule.migration}"
+        out.append(
+            f"::{GITHUB_LEVELS[f.rule.severity]} "
+            f"file={_gh_escape(file, True)},line={f.line},"
+            f"title={_gh_escape('DriftGuard: ' + f.rule.title, True)}::{_gh_escape(message)}"
+        )
+    out.append(f"DriftGuard: {files_scanned} file(s) scanned, {len(findings)} at-risk usage(s).")
+    return "\n".join(out)

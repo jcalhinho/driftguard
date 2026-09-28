@@ -5,10 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from app.config import RepoConfig, filter_findings, load_repo_config
 from app.github_app import GitHubApp
 from app.main import verify_signature
 from app.pipeline import apply_fixes, run_scan_pipeline
+from driftguard.config import RepoConfig, filter_findings, load_repo_config
 from driftguard.rules import load_rules
 from driftguard.scanner import scan_repo
 
@@ -412,3 +412,10 @@ def test_extract_tarball_size_limit(tmp_path, monkeypatch):
     monkeypatch.setattr(github_app, "MAX_EXTRACTED_BYTES", 10)
     with pytest.raises(github_app.GitHubAppError):
         github_app._extract_tarball(_tarball([("r/big.txt", b"x" * 100)]), tmp_path)
+
+
+def test_config_tolerates_bad_yaml(tmp_path):
+    (tmp_path / ".driftguard.yml").write_text("mode: [unclosed\n", encoding="utf-8")
+    assert load_repo_config(tmp_path).mode == "issue"
+    (tmp_path / ".driftguard.yml").write_text("ignore_paths: docs\nfoo: 1\n", encoding="utf-8")
+    assert load_repo_config(tmp_path).ignore_paths == ["docs"]

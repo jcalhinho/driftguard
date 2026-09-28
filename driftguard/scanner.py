@@ -1,6 +1,8 @@
 """Codebase scanning: detect API usage matching the loaded rules."""
 
 import os
+import re
+from bisect import bisect_right
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -12,6 +14,11 @@ SKIP_DIRS = {
 }
 MAX_FILE_SIZE = 2 * 1024 * 1024  # 2 MB
 COMMENT_MARKERS = ("#", "//", "*", "/*", "<!--", "REM ")
+# Hidden dirs are skipped, except these (CI workflows use deprecated actions/runners).
+SCANNED_DOT_DIRS = {".github", ".circleci", ".gitlab"}
+# Inline suppression, e.g. `stripe.charges.create(...)  # driftguard: ignore`
+NEWLINE = re.compile("\n")
+IGNORE_MARKER = re.compile(r"driftguard:\s*ignore", re.IGNORECASE)
 
 
 @dataclass
@@ -36,7 +43,10 @@ def scan_repo(path, rules: list[Rule]) -> tuple[list[Finding], int]:
     files_scanned = 0
 
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS and not d.startswith(".")]
+        dirnames[:] = [
+            d for d in dirnames
+            if d not in SKIP_DIRS and (not d.startswith(".") or d in SCANNED_DOT_DIRS)
+        ]
         for name in sorted(filenames):
             full = Path(dirpath) / name
             try:
@@ -59,12 +69,17 @@ def scan_repo(path, rules: list[Rule]) -> tuple[list[Finding], int]:
             files_scanned += 1
 
             rel = str(full.relative_to(root))
-            lines = text.splitlines()
+            lines = newlines = None
             for rule in rules:
                 for regex in rule.compiled:
                     for m in regex.finditer(text):
-                        line_no = text[: m.start()].count("\n") + 1
+                        if newlines is None:  # only computed for files that match
+                            lines = text.splitlines()
+                            newlines = [nl.start() for nl in NEWLINE.finditer(text)]
+                        line_no = bisect_right(newlines, m.start() - 1) + 1
                         line = lines[line_no - 1].strip() if 0 < line_no <= len(lines) else ""
+                        if IGNORE_MARKER.search(line):
+                            continue
                         findings.append(
                             Finding(
                                 rule=rule,

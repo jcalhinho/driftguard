@@ -1,0 +1,43 @@
+name: DriftGuard
+description: Find breaking API usage (retired models, sunset endpoints, deprecated SDKs) and annotate it inline.
+author: jcalhinho
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  path:
+    description: Directory to scan
+    default: "."
+  min-severity:
+    description: Lowest severity to report (info | warning | critical)
+    default: warning
+  fail-on-findings:
+    description: Fail the job when at-risk usages are found
+    default: "true"
+  ignore:
+    description: Space-separated glob patterns to skip, e.g. "tests/** docs/**"
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - name: Install DriftGuard
+      shell: bash
+      run: python -m pip install --quiet --disable-pip-version-check "$GITHUB_ACTION_PATH"
+    - name: Scan
+      shell: bash
+      env:
+        DG_PATH: ${{ inputs.path }}
+        DG_MIN: ${{ inputs.min-severity }}
+        DG_FAIL: ${{ inputs.fail-on-findings }}
+        DG_IGNORE: ${{ inputs.ignore }}
+      run: |
+        set -f  # keep glob patterns literal
+        args=(scan "$DG_PATH" --format github --min-severity "$DG_MIN")
+        for g in $DG_IGNORE; do args+=(--ignore "$g"); done
+        [ "$DG_FAIL" = "true" ] || args+=(--no-fail)
+        driftguard "${args[@]}"

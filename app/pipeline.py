@@ -5,13 +5,13 @@ import shutil
 import tempfile
 from pathlib import Path
 
+from driftguard.config import filter_findings, load_repo_config
 from driftguard.fixer import build_fix
 from driftguard.report import to_text
 from driftguard.rules import Rule
 from driftguard.scanner import Finding, scan_repo
 
 from . import storage
-from .config import filter_findings, load_repo_config
 from .github_app import GitHubApp
 
 BRANDING = "\n\n---\n🛡️ Detected by [DriftGuard](https://github.com/jcalhinho/driftguard) — the Dependabot for APIs."

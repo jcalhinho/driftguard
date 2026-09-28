@@ -198,3 +198,56 @@ def test_cli_rules_command():
     result = run_cli("rules")
     assert result.returncode == 0
     assert "stripe-charges-api-deprecated" in result.stdout
+
+
+# ---------- Scanner options ----------
+
+def test_scan_includes_github_workflows(tmp_path):
+    rules = load_rules(RULES_FILE)
+    wf = tmp_path / ".github" / "workflows"
+    wf.mkdir(parents=True)
+    (wf / "ci.yml").write_text("run: curl https://s3.amazonaws.com/b/k\n", encoding="utf-8")
+    (tmp_path / ".cache").mkdir()
+    (tmp_path / ".cache" / "x.py").write_text("https://s3.amazonaws.com/b/k\n", encoding="utf-8")
+    findings, _ = scan_repo(tmp_path, rules)
+    assert [f.file for f in findings] == [str(Path(".github/workflows/ci.yml"))]
+
+
+def test_scan_inline_ignore(tmp_path):
+    rules = load_rules(RULES_FILE)
+    (tmp_path / "a.py").write_text(
+        "stripe.charges.create(1)  # driftguard: ignore\nstripe.charges.create(2)\n",
+        encoding="utf-8",
+    )
+    findings, _ = scan_repo(tmp_path, rules)
+    assert [f.line for f in findings] == [2]
+
+
+def test_scan_line_numbers_multiline_match(tmp_path):
+    rules = load_rules(RULES_FILE)
+    (tmp_path / "a.py").write_text("x = 1\n\n\ny = 'text-davinci-003'\n", encoding="utf-8")
+    findings, _ = scan_repo(tmp_path, rules)
+    assert findings[0].line == 4
+
+
+def test_cli_ignore_and_repo_config(tmp_path):
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "t.py").write_text("stripe.charges.create(1)\n", encoding="utf-8")
+    (tmp_path / "a.py").write_text("stripe.charges.create(1)\n", encoding="utf-8")
+    data = json.loads(run_cli("scan", str(tmp_path), "--format", "json", "--ignore", "tests/**").stdout)
+    assert [f["file"] for f in data["findings"]] == ["a.py"]
+    (tmp_path / ".driftguard.yml").write_text("ignore_paths: [a.py]\n", encoding="utf-8")
+    data = json.loads(run_cli("scan", str(tmp_path), "--format", "json").stdout)
+    assert [f["file"] for f in data["findings"]] == [str(Path("tests/t.py"))]
+
+
+def test_cli_no_fail(tmp_path):
+    (tmp_path / "a.py").write_text("stripe.charges.create(1)\n", encoding="utf-8")
+    assert run_cli("scan", str(tmp_path), "--no-fail").returncode == 0
+
+
+def test_cli_github_format():
+    result = run_cli("scan", str(FIXTURE), "--format", "github")
+    first = result.stdout.splitlines()[0]
+    assert first.startswith("::")
+    assert "file=" in first and ",line=" in first
