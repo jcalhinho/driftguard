@@ -14,3 +14,9 @@ build/
 *.p12
 *-key.pem
 driftguard-key.pem
+
+# Build artifacts
+*.egg-info/
+bench/rust-scanner/target/
+.pytest_cache/
+.ruff_cache/

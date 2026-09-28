@@ -7,13 +7,13 @@ from pathlib import Path
 
 import pytest
 
-from engine.fixer import build_fix
-from engine.report import to_json, to_text
-from engine.rules import RulesError, load_rules
-from engine.scanner import scan_repo
+from driftguard.fixer import build_fix
+from driftguard.report import to_json, to_text
+from driftguard.rules import RulesError, load_rules
+from driftguard.scanner import scan_repo
 
 ROOT = Path(__file__).resolve().parents[1]
-RULES_FILE = ROOT / "rules" / "rules.yaml"
+RULES_FILE = ROOT / "driftguard" / "data" / "rules.yaml"
 FIXTURE = ROOT / "tests" / "fixtures" / "sample_repo"
 
 
@@ -156,7 +156,7 @@ def test_text_report(scan_result):
 
 def run_cli(*args):
     return subprocess.run(
-        [sys.executable, str(ROOT / "cli.py"), *args],
+        [sys.executable, "-m", "driftguard", *args],
         capture_output=True, text=True, cwd=ROOT, check=False,
     )
 

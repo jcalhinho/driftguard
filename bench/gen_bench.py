@@ -12,7 +12,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "tests" / "fixtures" / "sample_repo"
-RULES_YAML = ROOT / "rules" / "rules.yaml"
+RULES_YAML = ROOT / "driftguard" / "data" / "rules.yaml"
 
 
 def main() -> int:

@@ -1,18 +1,37 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "driftguard"
-version = "0.1.0"
-description = "Le Dependabot des API : détecte les usages d'API cassants dans ton code."
+version = "0.2.0"
+description = "The Dependabot for APIs: find breaking API usage (deprecated endpoints, retired models, sunset SDKs) in your code."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 dependencies = ["PyYAML>=6.0"]
 
+[project.optional-dependencies]
+app = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "httpx>=0.27",
+    "pyjwt>=2.9",
+    "cryptography>=44",
+]
+dev = ["pytest>=8.0", "ruff>=0.6"]
+
 [project.scripts]
-driftguard = "cli:main"
+driftguard = "driftguard.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/jcalhinho/driftguard"
 
 [tool.setuptools]
-packages = ["engine", "app"]
-py-modules = ["cli"]
+packages = ["driftguard"]
+
+[tool.setuptools.package-data]
+driftguard = ["data/*.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

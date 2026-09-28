@@ -2,11 +2,12 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY requirements.txt ./requirements.txt
-COPY app/requirements.txt ./app/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt -r app/requirements.txt
+# Engine + rules first (cached layer), then the web service.
+COPY pyproject.toml README.md LICENSE ./
+COPY driftguard ./driftguard
+RUN pip install --no-cache-dir ".[app]"
 
-COPY . .
+COPY app ./app
 
 EXPOSE 8000
 

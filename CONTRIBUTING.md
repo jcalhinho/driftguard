@@ -3,7 +3,7 @@
 Rules are **the heart of the product**: every documented breaking change becomes a
 detection. Writing a rule takes 5 minutes.
 
-## Format (rules/rules.yaml)
+## Format (driftguard/data/rules.yaml)
 
 ```yaml
 - id: stripe-charges-api-deprecated      # unique: provider-short-slug

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """DriftGuard CLI.
 
 Usage:
@@ -10,11 +9,10 @@ import argparse
 import sys
 from pathlib import Path
 
-from engine.report import to_json, to_text
-from engine.rules import RulesError, load_rules
-from engine.scanner import scan_repo
+from .report import to_json, to_text
+from .rules import DEFAULT_RULES_FILE, RulesError, load_rules
+from .scanner import scan_repo
 
-DEFAULT_RULES = Path(__file__).resolve().parent / "rules" / "rules.yaml"
 SEVERITY_RANK = {"info": 0, "warning": 1, "critical": 2}
 
 
@@ -27,7 +25,7 @@ def main(argv=None) -> int:
 
     scan = sub.add_parser("scan", help="Scan a codebase")
     scan.add_argument("path", help="Path to the directory to scan")
-    scan.add_argument("--rules", default=str(DEFAULT_RULES), help="YAML rules file")
+    scan.add_argument("--rules", default=str(DEFAULT_RULES_FILE), help="YAML rules file")
     scan.add_argument("--format", choices=["text", "json"], default="text")
     scan.add_argument("--min-severity", choices=list(SEVERITY_RANK), default="info")
     scan.add_argument("--only", action="append", default=[], help="Filter by provider (repeatable)")
@@ -37,7 +35,7 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        rules = load_rules(getattr(args, "rules", str(DEFAULT_RULES)))
+        rules = load_rules(getattr(args, "rules", str(DEFAULT_RULES_FILE)))
     except RulesError as e:
         print(f"❌ Rules error: {e}", file=sys.stderr)
         return 2

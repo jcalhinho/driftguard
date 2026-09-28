@@ -8,11 +8,11 @@ from app.config import RepoConfig, filter_findings, load_repo_config
 from app.github_app import GitHubApp
 from app.main import verify_signature
 from app.pipeline import apply_fixes, run_scan_pipeline
-from engine.rules import load_rules
-from engine.scanner import scan_repo
+from driftguard.rules import load_rules
+from driftguard.scanner import scan_repo
 
 ROOT = Path(__file__).resolve().parents[1]
-RULES_FILE = ROOT / "rules" / "rules.yaml"
+RULES_FILE = ROOT / "driftguard" / "data" / "rules.yaml"
 FIXTURE = ROOT / "tests" / "fixtures" / "sample_repo"
 
 

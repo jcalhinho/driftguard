@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 
-from engine.rules import load_rules
+from driftguard.rules import DEFAULT_RULES_FILE, load_rules
 
 from . import storage
 from .github_app import GitHubApp, GitHubAppError
@@ -15,7 +15,7 @@ from .pipeline import run_scan_pipeline
 
 app = FastAPI(title="DriftGuard", version="0.1.0")
 
-RULES_FILE = Path(os.getenv("DRIFTGUARD_RULES", str(Path(__file__).resolve().parents[1] / "rules" / "rules.yaml")))
+RULES_FILE = Path(os.getenv("DRIFTGUARD_RULES", str(DEFAULT_RULES_FILE)))
 
 _rules = None
 _gh_app: GitHubApp | None = None

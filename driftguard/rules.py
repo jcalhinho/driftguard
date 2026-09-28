@@ -6,6 +6,8 @@ from pathlib import Path
 
 import yaml
 
+DEFAULT_RULES_FILE = Path(__file__).resolve().parent / "data" / "rules.yaml"
+
 REQUIRED_FIELDS = ("id", "provider", "title", "severity", "patterns")
 VALID_SEVERITIES = ("info", "warning", "critical")
 

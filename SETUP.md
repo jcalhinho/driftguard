@@ -30,7 +30,7 @@ cp ../deploy/driftguard-key.pem .   # the downloaded private key
 
 ```bash
 cd driftguard
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt -r app/requirements.txt -e .
+python3 -m venv .venv && .venv/bin/pip install -e ".[app]"
 set -a && source app/.env && set +a
 .venv/bin/uvicorn app.main:app --port 8000
 # Test: curl http://localhost:8000/health
