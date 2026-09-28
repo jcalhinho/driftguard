@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DriftGuard — The Dependabot for APIs</title>
+<meta name="description" content="DriftGuard scans your code for breaking API changes — retired AI models, removed endpoints, sunset SDKs, dead CI runners. Open source, free for everyone.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<style>
+:root {
+  --bg: #0d1117;
+  --bg-card: #161b22;
+  --bg-input: #0d1117;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-muted: #8b949e;
+  --accent: #58a6ff;
+  --accent-hover: #79c0ff;
+  --red: #f85149;
+  --orange: #d29922;
+  --blue: #58a6ff;
+  --green: #3fb950;
+  --radius: 8px;
+  --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Hero ── */
+.hero {
+  text-align: center;
+  padding: 80px 24px 60px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+.hero h1 {
+  font-size: 3rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-bottom: 16px;
+}
+.hero h1 .shield { font-size: 2.5rem; }
+.hero .tagline {
+  font-size: 1.3rem;
+  color: var(--text-muted);
+  margin-bottom: 32px;
+}
+.hero .tagline strong { color: var(--text); }
+.hero-cta {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: var(--radius);
+  font-weight: 600;
+  font-size: 1rem;
+  border: 1px solid var(--border);
+  transition: all 0.15s;
+  cursor: pointer;
+}
+.btn-primary {
+  background: #238636;
+  border-color: #2ea043;
+  color: #fff;
+}
+.btn-primary:hover { background: #2ea043; text-decoration: none; }
+.btn-secondary {
+  background: var(--bg-card);
+  color: var(--text);
+}
+.btn-secondary:hover { border-color: var(--accent); text-decoration: none; }
+.btn code {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  background: rgba(255,255,255,0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* ── Example ── */
+.example-section {
+  max-width: 900px;
+  margin: 0 auto 60px;
+  padding: 0 24px;
+}
+.example-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.example-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.example-header .dot {
+  width: 12px; height: 12px; border-radius: 50%;
+}
+.example-header .dot.red { background: var(--red); }
+.example-header .dot.orange { background: var(--orange); }
+.example-header .dot.green { background: var(--green); }
+.example-code {
+  padding: 20px;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  line-height: 1.7;
+  overflow-x: auto;
+}
+.example-code .file { color: var(--accent); }
+.example-code .severity-critical { color: var(--red); font-weight: 600; }
+.example-code .severity-warning { color: var(--orange); font-weight: 600; }
+.example-code .line-num { color: var(--text-muted); }
+.example-code .match { color: var(--red); }
+.example-code .hint { color: var(--green); }
+.example-code .link { color: var(--accent); }
+
+/* ── Scanner ── */
+.scanner-section {
+  max-width: 900px;
+  margin: 0 auto 80px;
+  padding: 0 24px;
+}
+.scanner-section h2 {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  text-align: center;
+}
+.scanner-section .subtitle {
+  text-align: center;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+.scanner-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.scanner-input-wrap {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.scanner-input-wrap textarea {
+  width: 100%;
+  min-height: 180px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  padding: 12px;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.scanner-input-wrap textarea:focus { border-color: var(--accent); }
+.scanner-input-wrap textarea::placeholder { color: var(--text-muted); }
+.scanner-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.scanner-controls .btn-scan {
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  font-weight: 700;
+  padding: 10px 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: background 0.15s;
+}
+.scanner-controls .btn-scan:hover { background: var(--accent-hover); }
+.scanner-controls .btn-scan:disabled { opacity: 0.5; cursor: default; }
+.scanner-controls .btn-clear {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  padding: 10px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.scanner-controls .btn-clear:hover { color: var(--text); }
+.scanner-controls .sample-btn {
+  background: transparent;
+  color: var(--accent);
+  border: 1px dashed var(--border);
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.scanner-controls .sample-btn:hover { border-color: var(--accent); }
+.scanner-status {
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-family: var(--mono);
+}
+.scanner-results {
+  padding: 0;
+  max-height: 600px;
+  overflow-y: auto;
+}
+.scanner-results.empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-muted);
+}
+.finding {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
+.finding:last-child { border-bottom: none; }
+.finding-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.finding-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+.finding-badge.critical { background: rgba(248,81,73,0.15); color: var(--red); }
+.finding-badge.warning { background: rgba(210,153,34,0.15); color: var(--orange); }
+.finding-badge.info { background: rgba(88,166,255,0.15); color: var(--blue); }
+.finding-provider {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+.finding-title {
+  color: var(--text);
+  font-weight: 600;
+}
+.finding-line {
+  margin-left: 8px;
+  color: var(--text-muted);
+}
+.finding-match {
+  margin-top: 4px;
+  padding: 4px 8px;
+  background: rgba(248,81,73,0.08);
+  border-left: 3px solid var(--red);
+  border-radius: 2px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.finding-hint {
+  margin-top: 4px;
+  color: var(--green);
+}
+.finding-hint::before { content: "💡 "; }
+.finding-migration {
+  margin-top: 4px;
+}
+.finding-migration a {
+  font-size: 0.8rem;
+}
+.finding-migration::before { content: "🔗 "; }
+.scanner-summary {
+  padding: 12px 16px;
+  background: var(--bg-input);
+  border-top: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+.scanner-summary .count-critical { color: var(--red); font-weight: 600; }
+.scanner-summary .count-warning { color: var(--orange); font-weight: 600; }
+.scanner-summary .count-info { color: var(--blue); font-weight: 600; }
+.scanner-summary .count-clean { color: var(--green); font-weight: 600; }
+
+/* ── Rules table ── */
+.rules-section {
+  max-width: 900px;
+  margin: 0 auto 80px;
+  padding: 0 24px;
+}
+.rules-section h2 {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  text-align: center;
+}
+.rules-section .subtitle {
+  text-align: center;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+.rules-filter {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.rules-filter button {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 6px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.15s;
+}
+.rules-filter button:hover { border-color: var(--accent); color: var(--text); }
+.rules-filter button.active {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.rules-table-wrap {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.rules-table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.rules-table-wrap th {
+  text-align: left;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.rules-table-wrap td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.rules-table-wrap tr:last-child td { border-bottom: none; }
+.rules-table-wrap tr:hover td { background: rgba(88,166,255,0.04); }
+.sev-critical { color: var(--red); }
+.sev-warning { color: var(--orange); }
+.sev-info { color: var(--blue); }
+
+/* ── Features ── */
+.features-section {
+  max-width: 900px;
+  margin: 0 auto 80px;
+  padding: 0 24px;
+}
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+}
+.feature-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+.feature-card .icon { font-size: 2rem; margin-bottom: 12px; }
+.feature-card h3 { font-size: 1.1rem; margin-bottom: 8px; }
+.feature-card p { color: var(--text-muted); font-size: 0.9rem; }
+
+/* ── Install ── */
+.install-section {
+  max-width: 900px;
+  margin: 0 auto 80px;
+  padding: 0 24px;
+}
+.install-section h2 {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 24px;
+  text-align: center;
+}
+.install-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+}
+.install-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+.install-card h3 { font-size: 1.1rem; margin-bottom: 12px; }
+.install-card .badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(63,185,80,0.15);
+  color: var(--green);
+  margin-bottom: 12px;
+}
+.install-card pre {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+.install-card .copy-btn {
+  float: right;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  margin-bottom: 8px;
+}
+.install-card .copy-btn:hover { color: var(--text); border-color: var(--accent); }
+
+/* ── Footer ── */
+footer {
+  text-align: center;
+  padding: 40px 24px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+footer a { color: var(--accent); }
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  .hero h1 { font-size: 2rem; }
+  .hero .tagline { font-size: 1.05rem; }
+  .hero-cta { flex-direction: column; align-items: stretch; }
+  .btn { justify-content: center; }
+  .rules-table-wrap { overflow-x: auto; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════ HERO ═══════════════════════ -->
+<section class="hero">
+  <h1><span class="shield">🛡️</span> DriftGuard</h1>
+  <p class="tagline">
+    <strong>The Dependabot for APIs.</strong> Your code breaks when APIs change —
+    DriftGuard finds it before your users do.
+  </p>
+  <div class="hero-cta">
+    <a class="btn btn-primary" href="https://github.com/apps/driftguard" target="_blank" rel="noopener">
+      ⬇️ Install the GitHub App
+    </a>
+    <a class="btn btn-secondary" href="https://github.com/jcalhinho/driftguard" target="_blank" rel="noopener">
+      📦 View on GitHub
+    </a>
+  </div>
+</section>
+
+<!-- ═══════════════════════ EXAMPLE ═══════════════════════ -->
+<section class="example-section">
+  <div class="example-box">
+    <div class="example-header">
+      <span class="dot red"></span>
+      <span class="dot orange"></span>
+      <span class="dot green"></span>
+      <span>driftguard scan .</span>
+    </div>
+    <div class="example-code">
+<span class="file">📄 src/llm.py</span>
+  <span class="severity-critical">🔴 [critical]</span> <span class="line-num">L12</span>   Retired Claude model — requests to it fail
+         ↳ <span class="match">model="claude-3-opus-20240229"</span>
+         <span class="hint">💡 Move to claude-sonnet-4-6 or claude-opus-4-8.</span>
+         <span class="link">🔗 https://platform.claude.com/docs/en/about-claude/model-deprecations</span>
+
+<span class="file">📄 .github/workflows/ci.yml</span>
+  <span class="severity-critical">🔴 [critical]</span> <span class="line-num">L8</span>    actions/cache v1 and v2 no longer work
+         ↳ <span class="match">uses: actions/cache@v2</span>
+         <span class="hint">💡 Upgrade to actions/cache@v4 (same inputs).</span>
+         <span class="link">🔗 https://github.blog/changelog/2024-12-05-...</span>
+
+<span class="file">📄 payments.js</span>
+  <span class="severity-warning">🟠 [warning]</span>  <span class="line-num">L5</span>    The Charges API is legacy and cannot handle SCA / 3D Secure
+         ↳ <span class="match">stripe.charges.create(amount=1000, currency="eur")</span>
+         <span class="hint">💡 Migrate to Payment Intents (stripe.paymentIntents.create).</span>
+         <span class="link">🔗 https://docs.stripe.com/payments/payment-intents/migration</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════ SCANNER ═══════════════════════ -->
+<section class="scanner-section">
+  <h2>Try it now — paste your code</h2>
+  <p class="subtitle">No install, no signup. The scanner runs in your browser. 53 rules, same as the CLI.</p>
+  <div class="scanner-box">
+    <div class="scanner-input-wrap">
+      <textarea id="codeInput" placeholder="Paste code here (Python, JavaScript, YAML, Go, Ruby, PHP, Java, C#, HTML, shell…)"></textarea>
+      <div class="scanner-controls">
+        <button class="btn-scan" id="scanBtn" onclick="runScan()">🔍 Scan</button>
+        <button class="btn-clear" onclick="clearAll()">Clear</button>
+        <button class="sample-btn" onclick="loadSample()">Load sample code</button>
+      </div>
+    </div>
+    <div class="scanner-status" id="scannerStatus"></div>
+    <div class="scanner-results empty" id="scannerResults">
+      Paste code and click Scan to see what DriftGuard finds.
+    </div>
+    <div class="scanner-summary" id="scannerSummary" style="display:none;"></div>
+  </div>
+</section>
+
+<!-- ═══════════════════════ RULES TABLE ═══════════════════════ -->
+<section class="rules-section">
+  <h2>53 rules, 16 providers</h2>
+  <p class="subtitle">Every rule links to the official announcement. Rules are plain YAML — <a href="https://github.com/jcalhinho/driftguard/blob/main/CONTRIBUTING.md">contribute your own</a> in 10 minutes.</p>
+  <div class="rules-filter" id="rulesFilter"></div>
+  <div class="rules-table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Provider</th>
+          <th>Breaking change</th>
+          <th>Severity</th>
+          <th>Effective</th>
+        </tr>
+      </thead>
+      <tbody id="rulesBody"></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════════════════ FEATURES ═══════════════════════ -->
+<section class="features-section">
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="icon">🔔</div>
+      <h3>Issues by default</h3>
+      <p>A PR is only opened for strictly equivalent replacements (e.g. <code>cache@v2 → @v4</code>). Everything else is reported, never rewritten.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">🔇</div>
+      <h3>No noise</h3>
+      <p>Each finding is reported once, keyed on the code content — not the line number. Editing a file doesn't re-open issues.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">🔒</div>
+      <h3>Read-only scan</h3>
+      <p>The App downloads a tarball of the default branch into a temp dir and deletes it after. Nothing is executed.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon"> YAML</div>
+      <h3>Contributable rules</h3>
+      <p>Rules are plain YAML — no Python needed. Add a provider's breaking change in 10 minutes.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">🆓</div>
+      <h3>Free for everyone</h3>
+      <p>Public and private repos, individuals and teams. Engine, rules, CLI and Action are MIT licensed.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">⚡</div>
+      <h3>Three ways to run</h3>
+      <p>GitHub App (auto issues/PRs), GitHub Action (inline annotations), or CLI (local scan). Same rules everywhere.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════ INSTALL ═══════════════════════ -->
+<section class="install-section">
+  <h2>Get started in 30 seconds</h2>
+  <div class="install-grid">
+    <div class="install-card">
+      <span class="badge">Recommended</span>
+      <h3>GitHub Action</h3>
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <pre># .github/workflows/driftguard.yml
+name: DriftGuard
+on: [push, pull_request]
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jcalhinho/driftguard@v1
+        with:
+          min-severity: warning</pre>
+    </div>
+    <div class="install-card">
+      <h3>CLI</h3>
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <pre>pip install git+https://github.com/jcalhinho/driftguard
+driftguard scan .
+driftguard scan . --min-severity critical
+driftguard rules</pre>
+    </div>
+    <div class="install-card">
+      <h3>GitHub App</h3>
+      <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:12px;">
+        Install on your repos — it scans on every push to the default branch and opens issues or fix PRs automatically.
+      </p>
+      <a class="btn btn-primary" href="https://github.com/apps/driftguard" target="_blank" rel="noopener" style="font-size:0.9rem;padding:8px 20px;">
+        ⬇️ Install App
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════ FOOTER ═══════════════════════ -->
+<footer>
+  <p>DriftGuard — open source (MIT) — built by <a href="https://github.com/jcalhinho" target="_blank" rel="noopener">@jcalhinho</a></p>
+  <p style="margin-top:8px;">
+    <a href="https://github.com/jcalhinho/driftguard">GitHub</a> ·
+    <a href="https://github.com/jcalhinho/driftguard/blob/main/CONTRIBUTING.md">Contributing</a> ·
+    <a href="https://github.com/jcalhinho/driftguard/blob/main/SETUP.md">Self-hosting</a>
+  </p>
+</footer>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// DRIFTGUARD ONLINE SCANNER — same regex rules as the Python engine
+// Rules are embedded as JS objects (translated from rules.yaml)
+// ═══════════════════════════════════════════════════════════════════
+
+const RULES = [
+  // ── OpenAI ──
+  {id:"openai-gpt3-completion-models-shutdown",provider:"OpenAI",title:"GPT-3 completion models (text-davinci-003, code-davinci-002…) are shut down",severity:"critical",effective:"2024-01-04",patterns:[/\b(?:text-(?:davinci|curie|babbage|ada)-00[1-3]|code-(?:davinci|cushman)-00[12]|(?:text|code)-davinci-edit-001)\b/],hint:"Use gpt-3.5-turbo-instruct for raw completions, or a current chat model.",migration:"https://developers.openai.com/api/docs/deprecations"},
+  {id:"openai-edits-endpoint-shutdown",provider:"OpenAI",title:"The /v1/edits endpoint is shut down",severity:"critical",effective:"2024-01-04",patterns:[/\/v1\/edits\b/,/\bopenai\.Edit\.create\(/,/\.edits\.create\(/],hint:"Send the instruction and the text to the Chat Completions or Responses API instead.",migration:"https://developers.openai.com/api/docs/deprecations"},
+  {id:"openai-gpt3-embedding-models-shutdown",provider:"OpenAI",title:"GPT-3 similarity/search embedding models are shut down",severity:"critical",effective:"2024-01-04",patterns:[/\b(?:text-(?:similarity|search)|code-search)-(?:ada|babbage|curie|davinci)-[\w-]*001\b/],hint:"Re-embed your corpus with text-embedding-3-small (vectors are not compatible).",migration:"https://developers.openai.com/api/docs/deprecations"},
+  {id:"openai-gpt35-turbo-snapshots-shutdown",provider:"OpenAI",title:"gpt-3.5-turbo-0301 / -0613 / -16k-0613 snapshots are shut down",severity:"critical",effective:"2024-09-13",patterns:[/\bgpt-3\.5-turbo-(?:0301|0613|16k-0613)\b/],hint:"Use gpt-3.5-turbo (or a current model such as gpt-4.1-mini).",migration:"https://developers.openai.com/api/docs/deprecations"},
+  {id:"openai-gpt4-32k-shutdown",provider:"OpenAI",title:"gpt-4-32k models are shut down",severity:"critical",effective:"2025-06-06",patterns:[/\bgpt-4-32k(?:-\d{4})?\b/],hint:"Use gpt-4o or gpt-4.1 (larger context, lower price).",migration:"https://developers.openai.com/api/docs/deprecations"},
+  {id:"openai-gpt4-vision-preview-shutdown",provider:"OpenAI",title:"gpt-4-vision-preview is shut down",severity:"critical",effective:"2024-12-06",patterns:[/\bgpt-4-(?:1106-)?vision-preview\b/],hint:"Use gpt-4o, which accepts images natively.",migration:"https://developers.openai.com/api/docs/deprecations"},
+  {id:"openai-gpt4-turbo-preview-shutdown",provider:"OpenAI",title:"gpt-4-turbo-preview / gpt-4-1106-preview are shut down",severity:"critical",effective:"2026-03-26",patterns:[/\bgpt-4-(?:turbo|1106)-preview\b/],hint:"Use gpt-5 or gpt-4.1.",migration:"https://developers.openai.com/api/docs/deprecations"},
+  {id:"openai-gpt45-preview-shutdown",provider:"OpenAI",title:"gpt-4.5-preview is shut down",severity:"critical",effective:"2025-07-14",patterns:[/\bgpt-4\.5-preview\b/],hint:"Use gpt-4.1.",migration:"https://developers.openai.com/api/docs/deprecations"},
+  {id:"openai-o1-preview-mini-shutdown",provider:"OpenAI",title:"o1-preview and o1-mini are shut down",severity:"critical",effective:"2025-10-27",patterns:[/\bo1-(?:preview|mini)\b/],hint:"Use o3 instead of o1-preview, o4-mini instead of o1-mini.",migration:"https://developers.openai.com/api/docs/deprecations"},
+  {id:"openai-chatgpt-4o-latest-shutdown",provider:"OpenAI",title:"chatgpt-4o-latest is shut down",severity:"critical",effective:"2026-02-17",patterns:[/\bchatgpt-4o-latest\b/],hint:"Use gpt-5.1-chat-latest.",migration:"https://developers.openai.com/api/docs/deprecations"},
+  {id:"openai-codex-mini-latest-shutdown",provider:"OpenAI",title:"codex-mini-latest is shut down",severity:"critical",effective:"2026-02-12",patterns:[/\bcodex-mini-latest\b/],hint:"Use gpt-5-codex-mini.",migration:"https://developers.openai.com/api/docs/deprecations"},
+  {id:"openai-realtime-audio-preview-shutdown",provider:"OpenAI",title:"gpt-4o-realtime-preview / gpt-4o-audio-preview are shut down",severity:"critical",effective:"2026-05-07",patterns:[/\bgpt-4o-(?:realtime|audio)-preview\b/],hint:"Use gpt-realtime-1.5 or gpt-audio-1.5.",migration:"https://developers.openai.com/api/docs/deprecations"},
+  {id:"openai-realtime-beta-shutdown",provider:"OpenAI",title:"The Realtime API beta interface is shut down",severity:"critical",effective:"2026-05-12",patterns:[/OpenAI-Beta['"]?\s*[:=,]\s*['"]?realtime=v1/],hint:"Drop the OpenAI-Beta header and move to the GA Realtime API.",migration:"https://developers.openai.com/api/docs/deprecations"},
+  {id:"openai-dall-e-shutdown",provider:"OpenAI",title:"dall-e-2 and dall-e-3 are shut down",severity:"critical",effective:"2026-05-12",patterns:[/\bdall-e-[23]\b/],hint:"Use gpt-image-1 or gpt-image-2.",migration:"https://developers.openai.com/api/docs/deprecations"},
+  {id:"openai-assistants-api-shutdown",provider:"OpenAI",title:"The Assistants API is shut down",severity:"critical",effective:"2026-08-26",patterns:[/\.beta\.(?:assistants|threads)\./,/\/v1\/(?:assistants|threads)\b/,/OpenAI-Beta['"]?\s*[:=,]\s*['"]?assistants=/],hint:"Migrate to the Responses API and the Conversations API.",migration:"https://developers.openai.com/api/docs/assistants/migration"},
+  {id:"openai-sdk-v0-interface",provider:"OpenAI",title:"Pre-1.0 OpenAI SDK interface was removed",severity:"warning",effective:"2023-11-06",patterns:[/\bopenai\.(?:ChatCompletion|Completion|Embedding|Image|Moderation|Audio|FineTune)\.a?(?:create|transcribe|translate)\(/,/\bnew OpenAIApi\(/,/\.createChatCompletion\(/],hint:"Upgrade to openai>=1.0 and use client.chat.completions.create().",migration:"https://github.com/openai/openai-python/discussions/742"},
+
+  // ── Anthropic ──
+  {id:"anthropic-retired-models",provider:"Anthropic",title:"Retired Claude model — requests to it fail",severity:"critical",effective:"",patterns:[/(?<![\w.-])claude-(?:instant-)?[12](?:\.\d)?(?![\w.-])/,/(?<![\w.-])claude-3-(?:opus|sonnet|haiku)-2024\d{4}\b/,/(?<![\w.-])claude-3-5-(?:sonnet|haiku)-2024\d{4}\b/,/(?<![\w.-])claude-3-(?:5-sonnet|5-haiku|7-sonnet|opus)-latest\b/,/(?<![\w.-])claude-3-7-sonnet-20250219\b/,/(?<![\w.-])claude-(?:sonnet|opus)-4-20250514\b/,/(?<![\w.-])claude-opus-4-1-20250805\b/],hint:"Move to a current model (claude-sonnet-4-6, claude-opus-4-8 or claude-haiku-4-5).",migration:"https://platform.claude.com/docs/en/about-claude/model-deprecations"},
+
+  // ── Google ──
+  {id:"google-gemini-1x-models-shutdown",provider:"Google",title:"Gemini 1.0 and 1.5 models are shut down (requests return 404)",severity:"critical",effective:"2025-09-24",patterns:[/\bgemini-1\.[05]-(?:pro|flash)[\w.-]*/,/\bgemini-pro(?:-vision)?\b(?![\w.-])/],hint:"Use gemini-2.5-flash / gemini-2.5-pro or newer.",migration:"https://ai.google.dev/gemini-api/docs/deprecations"},
+  {id:"google-gemini-2-0-flash-shutdown",provider:"Google",title:"Gemini 2.0 Flash models are shut down",severity:"critical",effective:"2026-06-01",patterns:[/\bgemini-2\.0-flash[\w.-]*/],hint:"Use gemini-2.5-flash or gemini-2.5-flash-lite.",migration:"https://ai.google.dev/gemini-api/docs/deprecations"},
+  {id:"google-generativeai-sdk-deprecated",provider:"Google",title:"The google-generativeai / @google/generative-ai SDKs are deprecated",severity:"warning",effective:"2025-11-30",patterns:[/\bgoogle\.generativeai\b/,/(?<![\w-])google-generativeai\b/,/@google\/generative-ai\b/],hint:"Migrate to the unified Google Gen AI SDK (google-genai / @google/genai).",migration:"https://ai.google.dev/gemini-api/docs/migrate"},
+  {id:"google-palm-api-shutdown",provider:"Google",title:"The PaLM API (text-bison, chat-bison) is shut down",severity:"critical",effective:"",patterns:[/\bmodels\/(?:text|chat|embedding)-(?:bison|gecko)-001\b/,/generativelanguage\.googleapis\.com\/v1beta[23]\//,/\bpalm\.(?:generate_text|chat|generate_embeddings)\(/],hint:"Use the Gemini API (google-genai SDK).",migration:"https://ai.google.dev/gemini-api/docs/migrate"},
+  {id:"google-universal-analytics-sunset",provider:"Google",title:"Universal Analytics stopped processing data",severity:"critical",effective:"2023-07-01",patterns:[/\bUA-\d{4,10}-\d{1,4}\b/,/google-analytics\.com\/(?:analytics|ga)\.js/,/\bga\(\s*['"]create['"]\],hint:"Create a GA4 property and switch to a G-… measurement ID.",migration:"https://support.google.com/analytics/answer/11583528"},
+  {id:"google-optimize-sunset",provider:"Google",title:"Google Optimize has been shut down",severity:"critical",effective:"2023-09-30",patterns:[/\boptimize\.google\.com\b/,/googleoptimize\.com\/optimize\.js/],hint:"Remove the snippet and pick an A/B testing tool that integrates with GA4.",migration:"https://support.google.com/optimize/answer/12979939"},
+  {id:"google-sign-in-platform-library",provider:"Google",title:"The Google Sign-In platform library (gapi.auth2) is deprecated",severity:"warning",effective:"2023-03-31",patterns:[/apis\.google\.com\/js\/platform\.js/,/\bgapi\.auth2\b/,/class=['"]g-signin2\b/],hint:"Migrate to Google Identity Services (accounts.google.com/gsi/client).",migration:"https://developers.google.com/identity/sign-in/web/deprecation-and-sunset"},
+  {id:"google-image-charts-shutdown",provider:"Google",title:"The Google Image Charts API is shut down",severity:"critical",effective:"",patterns:[/chart\.googleapis\.com\/chart/],hint:"Render charts/QR codes client-side (Google Charts JS, Chart.js).",migration:"https://developers.google.com/chart/image"},
+
+  // ── Firebase ──
+  {id:"firebase-dynamic-links-shutdown",provider:"Firebase",title:"Firebase Dynamic Links is shut down (all links return 404)",severity:"critical",effective:"2025-08-25",patterns:[/\b[\w-]+\.page\.link\b/,/firebasedynamiclinks\.googleapis\.com/,/\bFirebaseDynamicLinks\b/,/firebase[-_]dynamic[-_]links/,/\bdynamicLinks\(\)/],hint:"Replace with App Links / Universal Links and update every published link.",migration:"https://firebase.google.com/support/dynamic-links-faq"},
+  {id:"firebase-fcm-legacy-api-shutdown",provider:"Firebase",title:"FCM legacy HTTP/XMPP APIs are shut down",severity:"critical",effective:"2024-07-22",patterns:[/fcm\.googleapis\.com\/fcm\/send/,/(?:gcm-http|android)\.googleapis\.com\/gcm\/send/,/\.(?:sendToDevice|sendToDeviceGroup|sendToTopic|sendToCondition)\(/],hint:"Use the FCM HTTP v1 API with OAuth2, or messaging().send() in the Admin SDK.",migration:"https://firebase.google.com/docs/cloud-messaging/send/v1-api"},
+
+  // ── Stripe ──
+  {id:"stripe-charges-api-deprecated",provider:"Stripe",title:"The Charges API is legacy and cannot handle SCA / 3D Secure",severity:"warning",effective:"",patterns:[/stripe\.charges\.create/,/stripe\.charges\.retrieve/,/Stripe::Charge\.create/,/\\Stripe\\Charge::create/],hint:"Migrate to Payment Intents (stripe.paymentIntents.create).",migration:"https://docs.stripe.com/payments/payment-intents/migration"},
+  {id:"stripe-sources-api-deprecated",provider:"Stripe",title:"The Sources API is deprecated",severity:"warning",effective:"",patterns:[/stripe\.sources\.create/,/stripe\.createSource\(/],hint:"Migrate to Payment Methods (stripe.paymentMethods.create()).",migration:"https://docs.stripe.com/payments/payment-methods/transitioning"},
+  {id:"stripe-redirect-to-checkout-removed",provider:"Stripe",title:"stripe.redirectToCheckout() is removed from Stripe.js",severity:"warning",effective:"2025-09-30",patterns:[/\.redirectToCheckout\(/],hint:"Return session.url from your server and redirect with window.location.href.",migration:"https://docs.stripe.com/changelog/clover/2025-09-30/remove-redirect-to-checkout"},
+  {id:"stripe-pinned-old-api-version",provider:"Stripe",title:"Stripe API version pinned to a pre-2020 release",severity:"info",effective:"",patterns:[/api_version['"]?\s*[:=]\s*['"]201[0-9]-/,/apiVersion['"]?\s*:\s*['"]201[0-9]-/],hint:"Pin a recent API version and test the upgrade.",migration:"https://docs.stripe.com/upgrades"},
+
+  // ── GitHub ──
+  {id:"github-oauth-password-grant",provider:"GitHub",title:"The OAuth password grant flow is disabled",severity:"critical",effective:"",patterns:[/access_token\?[^"'\s]*grant_type=password/],hint:"Migrate to the device flow or the web application flow.",migration:"https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps"},
+  {id:"github-oauth-authorizations-api-removed",provider:"GitHub",title:"The OAuth Authorizations API (/authorizations) was removed",severity:"critical",effective:"2020-11-13",patterns:[/api\.github\.com\/authorizations\b/],hint:"Use the web application flow or the device flow to obtain tokens.",migration:"https://developer.github.com/changes/2020-02-14-deprecating-oauth-auth-endpoint/"},
+  {id:"github-access-token-query-param-removed",provider:"GitHub",title:"Authenticating with ?access_token= in the URL is no longer supported",severity:"critical",effective:"",patterns:[/api\.github\.com\/[^\s"'<>]*[?&]access_token=/],hint:"Send the token in the Authorization header instead.",migration:"https://developer.github.com/changes/2020-02-10-deprecating-auth-through-query-param/"},
+  {id:"github-actions-artifact-v3-shutdown",provider:"GitHub",title:"actions/upload-artifact and download-artifact v1–v3 fail",severity:"critical",effective:"2025-01-30",patterns:[/actions\/(?:upload|download)-artifact@v[123](?!\d)/],hint:"Upgrade to v4. Artifacts become immutable — review the migration notes.",migration:"https://github.blog/changelog/2024-04-16-deprecation-notice-v3-of-the-artifact-actions/"},
+  {id:"github-actions-cache-v1-v2-shutdown",provider:"GitHub",title:"actions/cache v1 and v2 no longer work",severity:"critical",effective:"2025-02-01",patterns:[/actions\/cache@v[12](?![\d.])/,/actions\/cache@v[12]\.[\d.]+/],hint:"Upgrade to actions/cache@v4 (same inputs).",migration:"https://github.blog/changelog/2024-12-05-notice-of-upcoming-releases-and-breaking-changes-for-github-actions/"},
+  {id:"github-actions-retired-runner-images",provider:"GitHub",title:"Retired GitHub-hosted runner image (jobs never start)",severity:"critical",effective:"",patterns:[/\b(?:ubuntu-(?:16|18|20)\.04|windows-201[69]|macos-1[0-3])\b/],hint:"Use ubuntu-24.04 / windows-2025 / macos-15 (or the -latest labels).",migration:"https://github.com/actions/runner-images#available-images"},
+
+  // ── Slack ──
+  {id:"slack-files-upload-retired",provider:"Slack",title:"files.upload is retired",severity:"critical",effective:"2025-11-12",patterns:[/slack\.com\/api\/files\.upload\b/,/\.files_upload\(/,/\b(?:client|web|slack|app)\.files\.upload\(/],hint:"Use files_upload_v2 / files.uploadV2 in the official SDKs.",migration:"https://docs.slack.dev/changelog/2024-04-a-better-way-to-upload-files-is-here-to-stay/"},
+  {id:"slack-legacy-conversation-methods",provider:"Slack",title:"channels.*, groups.*, im.* and mpim.* methods are retired",severity:"critical",effective:"2021-02-24",patterns:[/slack\.com\/api\/(?:channels|groups|im|mpim)\.\w+/,/api_call\(\s*['"](?:channels|groups|im|mpim)\./,/\.(?:channels|groups|im|mpim)_(?:history|list|info|join|leave|create|mark|open|replies|setTopic|invite)\(/,/\b(?:client|web)\.(?:channels|groups|im|mpim)\.\w+\(/],hint:"Use the Conversations API (conversations.history, conversations.list…).",migration:"https://api.slack.com/changelog/2020-01-deprecating-antecedents-to-the-conversations-api"},
+  {id:"slack-rtm-start-deprecated",provider:"Slack",title:"rtm.start is deprecated — use rtm.connect",severity:"warning",effective:"",patterns:[/\brtm\.start\b/],hint:"Call rtm.connect and open the returned WebSocket; for new apps use Socket Mode.",migration:"https://api.slack.com/methods/rtm.connect"},
+
+  // ── Twilio / SendGrid ──
+  {id:"twilio-programmable-video-eol",provider:"Twilio",title:"Twilio Programmable Video reaches end of life on 2026-12-05",severity:"warning",effective:"2026-12-05",patterns:[/['"]twilio-video['"]/,/\bTwilio\.Video\b/,/video\.twilio\.com/,/\.video\.v1\.rooms\b/,/\bTwilioVideo\b/],hint:"Plan the migration to another video provider before the end-of-life date.",migration:"https://help.twilio.com/articles/20950630029595-Programmable-Video-End-of-Life-Notice"},
+  {id:"twilio-lookups-v1-deprecated",provider:"Twilio",title:"Lookup v1 is superseded by Lookup v2",severity:"info",effective:"",patterns:[/lookups\.twilio\.com\/v1\//,/\blookups\.v1\b/],hint:"Migrate to the Lookup v2 API (lookups.v2.phoneNumbers).",migration:"https://www.twilio.com/docs/lookup/v2-api"},
+  {id:"sendgrid-v2-api",provider:"SendGrid",title:"The v2 Web API with username/password (api_user) is retired",severity:"warning",effective:"",patterns:[/api\.sendgrid\.com\/api\/mail\.send/,/\bapi_user=/],hint:"Use the v3 Mail Send API (/v3/mail/send) with 'Authorization: Bearer SG.…'.",migration:"https://www.twilio.com/docs/sendgrid/for-developers/sending-email/upgrade-your-authentication-method-to-api-keys"},
+
+  // ── AWS ──
+  {id:"aws-sdk-js-v2-end-of-support",provider:"AWS",title:"AWS SDK for JavaScript v2 (aws-sdk) reached end of support",severity:"warning",effective:"2025-09-08",patterns:[/['"]aws-sdk(?:\/[\w/.-]+)?['"]\],hint:"Migrate to the modular v3 clients (@aws-sdk/client-*).",migration:"https://aws.amazon.com/blogs/developer/announcing-end-of-support-for-aws-sdk-for-javascript-v2/"},
+  {id:"aws-lambda-deprecated-runtimes",provider:"AWS",title:"Deprecated AWS Lambda runtime (no patches; updates get blocked)",severity:"warning",effective:"",patterns:[/[Rr]untime['"]?\s*[:=]\s*['"]?(?:nodejs(?:\d|1[0-8])(?:\.\d+|\.x)?|python(?:2\.7|3\.[6-9])|dotnetcore[1-3]\.\d|ruby2\.[57]|go1\.x|java8)(?![\w.])/,/\bRuntime\.(?:NODEJS_(?:1[0-8]|[4-9])_X|PYTHON_3_[6-9]|PYTHON_2_7|GO_1_X|DOTNET_CORE_[1-3]\w*|RUBY_2_[57])\b/],hint:"Move to a supported runtime (nodejs22.x, python3.12+, provided.al2023).",migration:"https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html#runtimes-deprecated"},
+  {id:"aws-s3-path-style-deprecated",provider:"AWS",title:"S3 path-style URLs are deprecated",severity:"info",effective:"",patterns:[/https?:\/\/s3(?:[.-][a-z0-9-]+)?\.amazonaws\.com\/[a-z0-9][a-z0-9.-]+\//],hint:"Use virtual-hosted style URLs (https://<bucket>.s3.<region>.amazonaws.com/<key>).",migration:"https://aws.amazon.com/blogs/aws/amazon-s3-path-deprecation-plan-the-rest-of-the-story/"},
+
+  // ── Microsoft ──
+  {id:"azure-ad-graph-retired",provider:"Microsoft",title:"Azure AD Graph (graph.windows.net) is retired",severity:"critical",effective:"2025-08-31",patterns:[/graph\.windows\.net/,/Microsoft\.Azure\.ActiveDirectory\.GraphClient/,/(?<![\w-])azure-graphrbac\b/],hint:"Migrate to Microsoft Graph (graph.microsoft.com).",migration:"https://learn.microsoft.com/en-us/graph/migrate-azure-ad-graph-overview"},
+  {id:"microsoft-adal-end-of-support",provider:"Microsoft",title:"ADAL authentication libraries are out of support",severity:"warning",effective:"2023-06-30",patterns:[/['"](?:adal-node|adal-angular[\w-]*|react-adal|adal)['"]/,/(?m)^\s*(?:import adal\b|from adal import)/,/Microsoft\.IdentityModel\.Clients\.ActiveDirectory/,/com\.microsoft\.aad:adal4j/],hint:"Migrate to MSAL (msal, @azure/msal-node, Microsoft.Identity.Client).",migration:"https://learn.microsoft.com/en-us/entra/identity-platform/msal-migration"},
+
+  // ── Meta ──
+  {id:"instagram-basic-display-shutdown",provider:"Meta",title:"The Instagram Basic Display API is shut down",severity:"critical",effective:"2024-12-04",patterns:[/scope=user_profile/,/['"]user_profile,user_media['"]\],hint:"Switch to the Instagram API with Instagram Login (requires a Professional account).",migration:"https://developers.facebook.com/blog/post/2024/09/04/update-on-instagram-basic-display-api/"},
+
+  // ── Data & misc ──
+  {id:"mongodb-atlas-app-services-shutdown",provider:"MongoDB",title:"Atlas Data API, App Services and Device Sync are shut down",severity:"critical",effective:"2025-09-30",patterns:[/\bdata\.mongodb-api\.com/,/\/endpoint\/data\/v1\/action\//,/['"]realm-web['"]/,/\bRealm\.App\(/],hint:"Query Atlas through a driver behind your own API.",migration:"https://www.mongodb.com/docs/atlas/app-services/deprecation/"},
+  {id:"darksky-api-shutdown",provider:"Apple",title:"The Dark Sky API is shut down",severity:"critical",effective:"2023-03-31",patterns:[/api\.darksky\.net/,/api\.forecast\.io/],hint:"Use Apple WeatherKit or another weather API.",migration:"https://developer.apple.com/weatherkit/get-started/"},
+  {id:"iex-cloud-shutdown",provider:"IEX",title:"IEX Cloud is shut down",severity:"critical",effective:"2024-08-31",patterns:[/\b(?:cloud|sandbox)\.iexapis\.com/],hint:"Move to another market-data provider.",migration:"https://en.wikipedia.org/wiki/Investors_Exchange"},
+  {id:"yahoo-yql-shutdown",provider:"Yahoo",title:"YQL (query.yahooapis.com) is shut down",severity:"critical",effective:"2019-01-03",patterns:[/query\.yahooapis\.com/],hint:"Use the underlying data source directly; YQL has no replacement.",migration:"https://developer.yahoo.com/yql/"},
+];
+
+// ═══════════════════════ Scanner logic ═══════════════════════
+
+function runScan() {
+  const code = document.getElementById('codeInput').value;
+  const statusEl = document.getElementById('scannerStatus');
+  const resultsEl = document.getElementById('scannerResults');
+  const summaryEl = document.getElementById('scannerSummary');
+
+  if (!code.trim()) {
+    statusEl.textContent = '⚠️ Paste some code first.';
+    return;
+  }
+
+  statusEl.textContent = 'Scanning…';
+  resultsEl.className = 'scanner-results';
+  resultsEl.innerHTML = '';
+
+  const lines = code.split('\n');
+  const findings = [];
+  let filesScanned = 1;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Check for inline suppression
+    if (/driftguard:\s*ignore/.test(line)) continue;
+
+    for (const rule of RULES) {
+      for (const pattern of rule.patterns) {
+        const match = line.match(pattern);
+        if (match) {
+          findings.push({
+            rule,
+            line: i + 1,
+            match: match[0],
+            content: line.trim(),
+          });
+          break; // one match per rule per line is enough
+        }
+      }
+    }
+  }
+
+  // Render
+  statusEl.textContent = `Scan complete — ${findings.length} finding${findings.length !== 1 ? 's' : ''}`;
+
+  if (findings.length === 0) {
+    resultsEl.className = 'scanner-results empty';
+    resultsEl.innerHTML = '✅ No breaking API usage found. Your code looks clean.';
+    summaryEl.style.display = 'none';
+    return;
+  }
+
+  const counts = { critical: 0, warning: 0, info: 0 };
+  findings.forEach(f => counts[f.rule.severity]++);
+
+  let html = '';
+  for (const f of findings) {
+    const sev = f.rule.severity;
+    html += `<div class="finding">
+      <div class="finding-header">
+        <span class="finding-badge ${sev}">${sev}</span>
+        <span class="finding-provider">${f.rule.provider}</span>
+        <span class="finding-title">${f.rule.title}</span>
+        <span class="finding-line">L${f.line}</span>
+      </div>
+      <div class="finding-match">${escapeHtml(f.content)}</div>
+      <div class="finding-hint">${escapeHtml(f.rule.hint)}</div>
+      <div class="finding-migration"><a href="${f.rule.migration}" target="_blank" rel="noopener">${f.rule.migration}</a></div>
+    </div>`;
+  }
+  resultsEl.innerHTML = html;
+
+  summaryEl.style.display = 'block';
+  summaryEl.innerHTML = `Found: <span class="count-critical">${counts.critical} critical</span> · <span class="count-warning">${counts.warning} warning</span> · <span class="count-info">${counts.info} info</span>`;
+}
+
+function clearAll() {
+  document.getElementById('codeInput').value = '';
+  document.getElementById('scannerStatus').textContent = '';
+  document.getElementById('scannerResults').className = 'scanner-results empty';
+  document.getElementById('scannerResults').innerHTML = 'Paste code and click Scan to see what DriftGuard finds.';
+  document.getElementById('scannerSummary').style.display = 'none';
+}
+
+function loadSample() {
+  document.getElementById('codeInput').value = `# A messy codebase with several breaking API calls
+
+import openai
+client = openai.OpenAI(api_key="sk-...")
+
+# Retired model — will fail at runtime
+response = client.chat.completions.create(
+    model="gpt-4-32k",
+    messages=[{"role": "user", "content": "Hello"}]
+)
+
+# Old SDK interface (pre-1.0)
+resp = openai.ChatCompletion.create(model="gpt-4o", messages=m)
+
+# Stripe Charges API — no SCA support
+charge = stripe.charges.create(amount=1000, currency="eur")
+
+# Dead GitHub Actions
+# .github/workflows/ci.yml
+#   uses: actions/cache@v2
+#   uses: actions/upload-artifact@v3
+#   runs-on: ubuntu-20.04
+
+# Slack files.upload — retired
+client.files_upload(channels="#general", file="report.pdf")
+
+# Retired Claude model
+model="claude-3-opus-20240229"
+
+# Gemini 1.5 — shut down
+model = genai.GenerativeModel("gemini-1.5-flash")
+
+# AWS SDK v2 — end of support
+const AWS = require('aws-sdk');
+
+# Dark Sky API — shut down
+url = f"https://api.darksky.net/forecast/{key}/{lat},{lon}"`;
+  runScan();
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function copyCode(btn) {
+  const pre = btn.parentElement.querySelector('pre');
+  navigator.clipboard.writeText(pre.textContent).then(() => {
+    btn.textContent = '✓ Copied';
+    setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+  });
+}
+
+// ═══════════════════════ Rules table ═══════════════════════
+
+function renderRulesTable(filter = 'all') {
+  const tbody = document.getElementById('rulesBody');
+  const filtered = filter === 'all' ? RULES : RULES.filter(r => r.provider === filter);
+
+  // Sort: provider, then severity (critical > warning > info), then title
+  const sevOrder = { critical: 0, warning: 1, info: 2 };
+  filtered.sort((a, b) => {
+    if (a.provider !== b.provider) return a.provider.localeCompare(b.provider);
+    if (sevOrder[a.severity] !== sevOrder[b.severity]) return sevOrder[a.severity] - sevOrder[b.severity];
+    return a.title.localeCompare(b.title);
+  });
+
+  tbody.innerHTML = filtered.map(r => {
+    const sevClass = `sev-${r.severity}`;
+    const sevIcon = r.severity === 'critical' ? '🔴' : r.severity === 'warning' ? '🟠' : '🔵';
+    const eff = r.effective || '—';
+    return `<tr>
+      <td><strong>${r.provider}</strong></td>
+      <td><a href="${r.migration}" target="_blank" rel="noopener">${escapeHtml(r.title)}</a></td>
+      <td class="${sevClass}">${sevIcon} ${r.severity}</td>
+      <td>${eff}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderRulesFilter() {
+  const providers = [...new Set(RULES.map(r => r.provider))].sort();
+  const filterEl = document.getElementById('rulesFilter');
+
+  let html = `<button class="active" onclick="filterRules('all', this)">All (${RULES.length})</button>`;
+  for (const p of providers) {
+    const count = RULES.filter(r => r.provider === p).length;
+    html += `<button onclick="filterRules('${p}', this)">${p} (${count})</button>`;
+  }
+  filterEl.innerHTML = html;
+}
+
+function filterRules(provider, btn) {
+  document.querySelectorAll('.rules-filter button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderRulesTable(provider);
+}
+
+// ═══════════════════════ Init ═══════════════════════
+renderRulesFilter();
+renderRulesTable();
+</script>
+</body>
+</html>

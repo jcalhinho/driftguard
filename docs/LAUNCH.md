@@ -8,6 +8,17 @@ Goal: 30+ GitHub App installs, 100+ stars, first quality feedback.
 - [ ] Demo GIF (10 s): a push on a test repo → DriftGuard issue opened
 - [ ] README with: badge, covered-rules table, 2-click install
 - [ ] Public repo `jcalhinho/driftguard` with green CI
+- [ ] **GitHub App set to "Any account"** (see [PRE-LAUNCH-CHECKLIST.md](./PRE-LAUNCH-CHECKLIST.md))
+- [ ] **Stable webhook URL** (named Cloudflare tunnel or Caddy, not quick tunnel)
+- [ ] **Landing page live** on GitHub Pages (`docs/index.html` → `jcalhinho.github.io/driftguard`)
+- [ ] **Online scanner** working on the landing page
+- [ ] **Scan of top 1000 repos** completed, stats integrated into launch posts
+
+## Assets
+
+- **Landing page + online scanner**: `docs/index.html` — deploy via GitHub Pages
+- **Repo scan script**: `scripts/scan_popular_repos.py` — `GITHUB_TOKEN=xxx python scripts/scan_popular_repos.py --limit 1000`
+- **Pre-launch checklist**: `docs/PRE-LAUNCH-CHECKLIST.md`
 
 ## Launch sequence (over 2 weeks)
 
