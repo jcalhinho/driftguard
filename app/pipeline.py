@@ -49,7 +49,7 @@ def apply_fixes(repo_dir: Path, findings: list[Finding]) -> list[tuple[str, str]
 
     changes: list[tuple[str, str]] = []
     for rel_path, file_findings in by_file.items():
-        fixable = [f for f in file_findings if any(k in f.match for k in f.rule.replace)]
+        fixable = [f for f in file_findings if build_fix(f)["action"] == "replace"]
         if not fixable:
             continue
         full = Path(repo_dir) / rel_path

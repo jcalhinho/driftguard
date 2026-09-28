@@ -46,7 +46,7 @@ Then:
 
 ```bash
 docker compose -f deploy/docker-compose.yml up -d --build
-curl http://localhost:8000/health   # → {"status":"ok","rules":13}
+curl http://localhost:8000/health   # → {"status":"ok","rules":53}
 ```
 
 ## 4. Public HTTPS URL (two options)

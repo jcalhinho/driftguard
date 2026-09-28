@@ -18,6 +18,7 @@ def to_json(root, findings: list[Finding], files_scanned: int) -> str:
                     "provider": f.rule.provider,
                     "title": f.rule.title,
                     "severity": f.rule.severity,
+                    "effective": f.rule.effective,
                     "file": f.file,
                     "line": f.line,
                     "context": f.context,
@@ -46,6 +47,8 @@ def to_text(root, findings: list[Finding], files_scanned: int) -> str:
             lines.append(f"📄 {f.file}")
             current_file = f.file
         comment_note = " · inside a comment" if f.in_comment else ""
+        if f.rule.effective:
+            comment_note = f" · since {f.rule.effective}" + comment_note
         lines.append(
             f"  {ICONS[f.rule.severity]} [{f.rule.severity:8}] L{f.line:<4} "
             f"{f.rule.title}{comment_note}"

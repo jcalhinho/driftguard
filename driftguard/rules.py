@@ -10,6 +10,7 @@ DEFAULT_RULES_FILE = Path(__file__).resolve().parent / "data" / "rules.yaml"
 
 REQUIRED_FIELDS = ("id", "provider", "title", "severity", "patterns")
 VALID_SEVERITIES = ("info", "warning", "critical")
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 @dataclass
@@ -22,6 +23,10 @@ class Rule:
     fix_hint: str = ""
     migration: str = ""
     since: str = ""
+    effective: str = ""  # date the change took (or takes) effect upstream
+    files: list[str] = field(default_factory=list)  # optional path globs the rule applies to
+    examples: list[str] = field(default_factory=list)  # must match (checked by the tests)
+    counter_examples: list[str] = field(default_factory=list)  # must NOT match
     replace: dict = field(default_factory=dict)
     compiled: list = field(default_factory=list)
 
@@ -49,6 +54,9 @@ def load_rules(path) -> list[Rule]:
                 f"Invalid severity for '{rule_id}': {entry['severity']} "
                 f"(expected one of: {', '.join(VALID_SEVERITIES)})"
             )
+        effective = str(entry.get("effective", ""))
+        if effective and not DATE_RE.match(effective):
+            raise RulesError(f"Invalid effective date for '{rule_id}': {effective} (YYYY-MM-DD)")
         seen_ids.add(rule_id)
         try:
             compiled = [re.compile(p) for p in entry["patterns"]]
@@ -65,6 +73,10 @@ def load_rules(path) -> list[Rule]:
                 fix_hint=entry.get("fix_hint", ""),
                 migration=entry.get("migration", ""),
                 since=str(entry.get("since", "")),
+                effective=effective,
+                files=list(entry.get("files") or []),
+                examples=list(entry.get("examples") or []),
+                counter_examples=list(entry.get("counter_examples") or []),
                 replace=entry.get("replace") or {},
                 compiled=compiled,
             )

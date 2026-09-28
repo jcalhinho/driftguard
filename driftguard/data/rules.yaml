@@ -2,155 +2,881 @@
 #
 # Each rule describes ONE breaking change of an API:
 #
-# id:        unique identifier (provider-slug)
-# provider:  API provider
-# title:     human-readable title of the breaking change
-# severity:  info | warning | critical
-# patterns:  regular expressions detecting the affected usage (one or more)
-# fix_hint:  remediation advice shown in the issue/PR
-# migration: link to the official migration guide
-# replace:   (optional) mechanical replacement mapping {old: new}. ONLY for strictly
-#            equivalent changes (same arguments, same response) — the fix is committed
-#            as-is in PR mode. When in doubt, leave it out: the finding becomes an issue.
-# since:     date the rule was introduced (YYYY-MM-DD)
+# id:               unique identifier (provider-slug) — never renamed once released,
+#                   users reference it in `ignore_rules`
+# provider:         API provider
+# title:            human-readable title of the breaking change
+# severity:         critical = requests fail today · warning = sunset announced / unsupported
+#                   SDK · info = legacy, worth planning
+# effective:        date the shutdown/deprecation took (or takes) effect (YYYY-MM-DD)
+# patterns:         Python regexes detecting the affected usage (one or more)
+# files:            (optional) path globs the rule is restricted to
+# examples:         code lines that MUST match (enforced by the test suite)
+# counter_examples: code lines that must NOT match (guards against false positives)
+# fix_hint:         remediation advice shown in the issue/PR
+# migration:        link to the official announcement or migration guide
+# replace:          (optional) mechanical replacement mapping {old: new}. ONLY for strictly
+#                   equivalent changes (same arguments, same response) — the fix is committed
+#                   as-is in PR mode. When in doubt, leave it out: the finding becomes an issue.
+# since:            date the rule was added to DriftGuard (YYYY-MM-DD)
+#
+# Tip: patterns are single-quoted YAML, so backslashes are literal and a quote is written ''.
 
 rules:
-  - id: stripe-charges-api-deprecated
-    provider: Stripe
-    title: "The Charges API is deprecated — use Payment Intents"
+
+  # ───────────────────────────── OpenAI ─────────────────────────────
+
+  - id: openai-gpt3-completion-models-shutdown
+    provider: OpenAI
+    title: GPT-3 completion models (text-davinci-003, text-curie-001, code-davinci-002…) are shut down
+    severity: critical
+    effective: '2024-01-04'
+    patterns:
+      - '\b(?:text-(?:davinci|curie|babbage|ada)-00[1-3]|code-(?:davinci|cushman)-00[12]|(?:text|code)-davinci-edit-001)\b'
+    examples:
+      - 'model="text-davinci-003"'
+      - "engine: 'code-davinci-002'"
+    counter_examples:
+      - 'model="gpt-3.5-turbo-instruct"'
+    fix_hint: Use gpt-3.5-turbo-instruct for raw completions, or a current chat model.
+    migration: https://developers.openai.com/api/docs/deprecations
+    since: '2026-09-27'
+
+  - id: openai-edits-endpoint-shutdown
+    provider: OpenAI
+    title: The /v1/edits endpoint is shut down
+    severity: critical
+    effective: '2024-01-04'
+    patterns:
+      - '/v1/edits\b'
+      - '\bopenai\.Edit\.create\('
+      - '\.edits\.create\('
+    examples:
+      - 'requests.post("https://api.openai.com/v1/edits", json=body)'
+      - 'openai.Edit.create(model="text-davinci-edit-001", input=x)'
+    fix_hint: Send the instruction and the text to the Chat Completions or Responses API instead.
+    migration: https://developers.openai.com/api/docs/deprecations
+    since: '2026-09-28'
+
+  - id: openai-gpt3-embedding-models-shutdown
+    provider: OpenAI
+    title: GPT-3 similarity/search embedding models are shut down
+    severity: critical
+    effective: '2024-01-04'
+    patterns:
+      - '\b(?:text-(?:similarity|search)|code-search)-(?:ada|babbage|curie|davinci)-[\w-]*001\b'
+    examples:
+      - 'model="text-similarity-ada-001"'
+      - 'model="text-search-curie-doc-001"'
+    counter_examples:
+      - 'model="text-embedding-3-small"'
+    fix_hint: Re-embed your corpus with text-embedding-3-small (vectors are not compatible).
+    migration: https://developers.openai.com/api/docs/deprecations
+    since: '2026-09-28'
+
+  - id: openai-gpt35-turbo-snapshots-shutdown
+    provider: OpenAI
+    title: gpt-3.5-turbo-0301 / -0613 / -16k-0613 snapshots are shut down
+    severity: critical
+    effective: '2024-09-13'
+    patterns:
+      - '\bgpt-3\.5-turbo-(?:0301|0613|16k-0613)\b'
+    examples:
+      - 'model="gpt-3.5-turbo-0613"'
+      - 'model: "gpt-3.5-turbo-16k-0613"'
+    counter_examples:
+      - 'model="gpt-3.5-turbo-0125"'
+    fix_hint: Use gpt-3.5-turbo (or a current model such as gpt-4.1-mini).
+    migration: https://developers.openai.com/api/docs/deprecations
+    since: '2026-09-28'
+
+  - id: openai-gpt4-32k-shutdown
+    provider: OpenAI
+    title: gpt-4-32k models are shut down
+    severity: critical
+    effective: '2025-06-06'
+    patterns:
+      - '\bgpt-4-32k(?:-\d{4})?\b'
+    examples:
+      - 'model="gpt-4-32k"'
+      - 'model="gpt-4-32k-0613"'
+    fix_hint: Use gpt-4o or gpt-4.1 (larger context, lower price).
+    migration: https://developers.openai.com/api/docs/deprecations
+    since: '2026-09-28'
+
+  - id: openai-gpt4-vision-preview-shutdown
+    provider: OpenAI
+    title: gpt-4-vision-preview is shut down
+    severity: critical
+    effective: '2024-12-06'
+    patterns:
+      - '\bgpt-4-(?:1106-)?vision-preview\b'
+    examples:
+      - 'model="gpt-4-vision-preview"'
+    fix_hint: Use gpt-4o, which accepts images natively.
+    migration: https://developers.openai.com/api/docs/deprecations
+    since: '2026-09-28'
+
+  - id: openai-gpt4-turbo-preview-shutdown
+    provider: OpenAI
+    title: gpt-4-turbo-preview / gpt-4-1106-preview are shut down
+    severity: critical
+    effective: '2026-03-26'
+    patterns:
+      - '\bgpt-4-(?:turbo|1106)-preview\b'
+    examples:
+      - 'model="gpt-4-1106-preview"'
+      - 'model="gpt-4-turbo-preview"'
+    counter_examples:
+      - 'model="gpt-4-turbo"'
+    fix_hint: Use gpt-5 or gpt-4.1.
+    migration: https://developers.openai.com/api/docs/deprecations
+    since: '2026-09-28'
+
+  - id: openai-gpt45-preview-shutdown
+    provider: OpenAI
+    title: gpt-4.5-preview is shut down
+    severity: critical
+    effective: '2025-07-14'
+    patterns:
+      - '\bgpt-4\.5-preview\b'
+    examples:
+      - 'model="gpt-4.5-preview"'
+    fix_hint: Use gpt-4.1.
+    migration: https://developers.openai.com/api/docs/deprecations
+    since: '2026-09-28'
+
+  - id: openai-o1-preview-mini-shutdown
+    provider: OpenAI
+    title: o1-preview (2025-07-28) and o1-mini (2025-10-27) are shut down
+    severity: critical
+    effective: '2025-10-27'
+    patterns:
+      - '\bo1-(?:preview|mini)\b'
+    examples:
+      - 'model="o1-mini"'
+      - 'model="o1-preview-2024-09-12"'
+    counter_examples:
+      - 'model="o4-mini"'
+    fix_hint: Use o3 instead of o1-preview, o4-mini instead of o1-mini.
+    migration: https://developers.openai.com/api/docs/deprecations
+    since: '2026-09-28'
+
+  - id: openai-chatgpt-4o-latest-shutdown
+    provider: OpenAI
+    title: chatgpt-4o-latest is shut down
+    severity: critical
+    effective: '2026-02-17'
+    patterns:
+      - '\bchatgpt-4o-latest\b'
+    examples:
+      - 'model="chatgpt-4o-latest"'
+    fix_hint: Use gpt-5.1-chat-latest.
+    migration: https://developers.openai.com/api/docs/deprecations
+    since: '2026-09-28'
+
+  - id: openai-codex-mini-latest-shutdown
+    provider: OpenAI
+    title: codex-mini-latest is shut down
+    severity: critical
+    effective: '2026-02-12'
+    patterns:
+      - '\bcodex-mini-latest\b'
+    examples:
+      - 'model="codex-mini-latest"'
+    fix_hint: Use gpt-5-codex-mini.
+    migration: https://developers.openai.com/api/docs/deprecations
+    since: '2026-09-28'
+
+  - id: openai-realtime-audio-preview-shutdown
+    provider: OpenAI
+    title: gpt-4o-realtime-preview / gpt-4o-audio-preview are shut down
+    severity: critical
+    effective: '2026-05-07'
+    patterns:
+      - '\bgpt-4o-(?:realtime|audio)-preview\b'
+    examples:
+      - 'model="gpt-4o-realtime-preview-2024-12-17"'
+      - 'model="gpt-4o-audio-preview"'
+    fix_hint: Use gpt-realtime-1.5 (Realtime) or gpt-audio-1.5 (Chat Completions audio).
+    migration: https://developers.openai.com/api/docs/deprecations
+    since: '2026-09-28'
+
+  - id: openai-realtime-beta-shutdown
+    provider: OpenAI
+    title: The Realtime API beta interface is shut down
+    severity: critical
+    effective: '2026-05-12'
+    patterns:
+      - 'OpenAI-Beta[''"]?\s*[:=,]\s*[''"]?realtime=v1'
+    examples:
+      - 'headers={"OpenAI-Beta": "realtime=v1"}'
+    fix_hint: Drop the OpenAI-Beta header and move to the GA Realtime API event format.
+    migration: https://developers.openai.com/api/docs/deprecations
+    since: '2026-09-28'
+
+  - id: openai-dall-e-shutdown
+    provider: OpenAI
+    title: dall-e-2 and dall-e-3 are shut down
+    severity: critical
+    effective: '2026-05-12'
+    patterns:
+      - '\bdall-e-[23]\b'
+    examples:
+      - 'client.images.generate(model="dall-e-3", prompt=p)'
+    fix_hint: Use gpt-image-1 or gpt-image-2 (response format differs — check b64_json handling).
+    migration: https://developers.openai.com/api/docs/deprecations
+    since: '2026-09-28'
+
+  - id: openai-assistants-api-shutdown
+    provider: OpenAI
+    title: The Assistants API is shut down
+    severity: critical
+    effective: '2026-08-26'
+    patterns:
+      - '\.beta\.(?:assistants|threads)\.'
+      - '/v1/(?:assistants|threads)\b'
+      - 'OpenAI-Beta[''"]?\s*[:=,]\s*[''"]?assistants='
+    examples:
+      - 'assistant = client.beta.assistants.create(model="gpt-4o")'
+      - 'await openai.beta.threads.runs.create(threadId, { assistant_id })'
+      - 'fetch("https://api.openai.com/v1/threads", opts)'
+    fix_hint: Migrate to the Responses API (tools, state) and the Conversations API (threads).
+    migration: https://developers.openai.com/api/docs/assistants/migration
+    since: '2026-09-28'
+
+  - id: openai-sdk-v0-interface
+    provider: OpenAI
+    title: Pre-1.0 OpenAI SDK interface (openai.ChatCompletion.create, OpenAIApi) was removed
+    severity: warning
+    effective: '2023-11-06'
+    patterns:
+      - '\bopenai\.(?:ChatCompletion|Completion|Embedding|Image|Moderation|Audio|FineTune)\.a?(?:create|transcribe|translate)\('
+      - '\bnew OpenAIApi\('
+      - '\.createChatCompletion\('
+    examples:
+      - 'resp = openai.ChatCompletion.create(model="gpt-4o", messages=m)'
+      - 'await openai.Completion.acreate(prompt=p)'
+      - 'const openai = new OpenAIApi(configuration);'
+    counter_examples:
+      - 'client.chat.completions.create(model="gpt-4o", messages=m)'
+    fix_hint: Upgrade to openai>=1.0 (Python) / openai v4+ (Node) and use client.chat.completions.create(). Breaks as soon as the dependency is upgraded.
+    migration: https://github.com/openai/openai-python/discussions/742
+    since: '2026-09-28'
+
+  # ───────────────────────────── Anthropic ─────────────────────────────
+
+  - id: anthropic-retired-models
+    provider: Anthropic
+    title: Retired Claude model — requests to it fail
     severity: critical
     patterns:
-      - "stripe\\.charges\\.create"
-      - "stripe\\.charges\\.retrieve"
-      - "charges/create"
-    fix_hint: "Replace with stripe.paymentIntents.create() and follow the migration guide."
-    migration: "https://docs.stripe.com/payments/payment-intents/migration"
-    since: "2026-09-27"
+      # Claude API IDs only: Bedrock IDs ("anthropic.claude-…") follow their own schedule.
+      - '(?<![\w.-])claude-(?:instant-)?[12](?:\.\d)?(?![\w.-])'
+      - '(?<![\w.-])claude-3-(?:opus|sonnet|haiku)-2024\d{4}\b'
+      - '(?<![\w.-])claude-3-5-(?:sonnet|haiku)-2024\d{4}\b'
+      - '(?<![\w.-])claude-3-(?:5-sonnet|5-haiku|7-sonnet|opus)-latest\b'
+      - '(?<![\w.-])claude-3-7-sonnet-20250219\b'
+      - '(?<![\w.-])claude-(?:sonnet|opus)-4-20250514\b'
+      - '(?<![\w.-])claude-opus-4-1-20250805\b'
+    examples:
+      - 'model="claude-2.1"'
+      - 'model="claude-instant-1.2"'
+      - 'model="claude-3-opus-20240229"'
+      - 'model="claude-3-5-sonnet-20241022"'
+      - 'model="claude-3-haiku-20240307"'
+      - 'model="claude-3-7-sonnet-latest"'
+      - 'model="claude-sonnet-4-20250514"'
+      - 'model="claude-opus-4-1-20250805"'
+    counter_examples:
+      - 'model="claude-sonnet-4-5-20250929"'
+      - 'model="claude-opus-4-8"'
+      - 'model_id="anthropic.claude-3-haiku-20240307-v1:0"'
+    fix_hint: Move to a current model (claude-sonnet-4-6, claude-opus-4-8 or claude-haiku-4-5). Dates apply to the Claude API; Bedrock and Vertex AI publish their own schedules.
+    migration: https://platform.claude.com/docs/en/about-claude/model-deprecations
+    since: '2026-09-28'
+
+  # ───────────────────────────── Google ─────────────────────────────
+
+  - id: google-gemini-1x-models-shutdown
+    provider: Google
+    title: Gemini 1.0 and 1.5 models are shut down (requests return 404)
+    severity: critical
+    effective: '2025-09-24'
+    patterns:
+      - '\bgemini-1\.[05]-(?:pro|flash)[\w.-]*'
+      - '\bgemini-pro(?:-vision)?\b(?![\w.-])'
+    examples:
+      - 'model = genai.GenerativeModel("gemini-1.5-flash")'
+      - 'model: "gemini-1.5-pro-002"'
+      - 'GenerativeModel("gemini-pro")'
+    counter_examples:
+      - 'model="gemini-2.5-pro"'
+    fix_hint: Use gemini-2.5-flash / gemini-2.5-pro or newer.
+    migration: https://ai.google.dev/gemini-api/docs/deprecations
+    since: '2026-09-28'
+
+  - id: google-gemini-2-0-flash-shutdown
+    provider: Google
+    title: Gemini 2.0 Flash models are shut down
+    severity: critical
+    effective: '2026-06-01'
+    patterns:
+      - '\bgemini-2\.0-flash[\w.-]*'
+    examples:
+      - 'model="gemini-2.0-flash"'
+      - 'model="gemini-2.0-flash-lite-001"'
+    counter_examples:
+      - 'model="gemini-2.5-flash"'
+    fix_hint: Use gemini-2.5-flash or gemini-2.5-flash-lite.
+    migration: https://ai.google.dev/gemini-api/docs/deprecations
+    since: '2026-09-28'
+
+  - id: google-generativeai-sdk-deprecated
+    provider: Google
+    title: The google-generativeai / @google/generative-ai SDKs are deprecated and unsupported
+    severity: warning
+    effective: '2025-11-30'
+    patterns:
+      - '\bgoogle\.generativeai\b'
+      - '(?<![\w-])google-generativeai\b'
+      - '@google/generative-ai\b'
+    examples:
+      - 'import google.generativeai as genai'
+      - 'google-generativeai==0.8.3'
+      - 'import { GoogleGenerativeAI } from "@google/generative-ai";'
+    counter_examples:
+      - 'from google import genai'
+      - 'import { GoogleGenAI } from "@google/genai";'
+    fix_hint: Migrate to the unified Google Gen AI SDK (google-genai / @google/genai).
+    migration: https://ai.google.dev/gemini-api/docs/migrate
+    since: '2026-09-28'
+
+  - id: google-palm-api-shutdown
+    provider: Google
+    title: The PaLM API (text-bison, chat-bison) is shut down
+    severity: critical
+    patterns:
+      - '\bmodels/(?:text|chat|embedding)-(?:bison|gecko)-001\b'
+      - 'generativelanguage\.googleapis\.com/v1beta[23]/'
+      - '\bpalm\.(?:generate_text|chat|generate_embeddings)\('
+    examples:
+      - 'model="models/text-bison-001"'
+      - 'url = "https://generativelanguage.googleapis.com/v1beta2/models"'
+      - 'palm.generate_text(prompt=p)'
+    fix_hint: Use the Gemini API (google-genai SDK).
+    migration: https://ai.google.dev/gemini-api/docs/migrate
+    since: '2026-09-28'
+
+  - id: google-universal-analytics-sunset
+    provider: Google
+    title: Universal Analytics (UA-… properties, analytics.js) stopped processing data
+    severity: critical
+    effective: '2023-07-01'
+    patterns:
+      - '\bUA-\d{4,10}-\d{1,4}\b'
+      - 'google-analytics\.com/(?:analytics|ga)\.js'
+      - '\bga\(\s*[''"]create[''"]'
+    examples:
+      - 'gtag("config", "UA-12345678-1");'
+      - '<script src="https://www.google-analytics.com/analytics.js"></script>'
+      - "ga('create', trackingId, 'auto');"
+    counter_examples:
+      - 'gtag("config", "G-ABC123XYZ");'
+    fix_hint: Create a GA4 property and switch to a G-… measurement ID.
+    migration: https://support.google.com/analytics/answer/11583528
+    since: '2026-09-28'
+
+  - id: google-optimize-sunset
+    provider: Google
+    title: Google Optimize has been shut down
+    severity: critical
+    effective: '2023-09-30'
+    patterns:
+      - '\boptimize\.google\.com\b'
+      - 'googleoptimize\.com/optimize\.js'
+    examples:
+      - '<script src="https://www.googleoptimize.com/optimize.js?id=OPT-ABC1234"></script>'
+    fix_hint: Remove the snippet (it only adds page weight) and pick an A/B testing tool that integrates with GA4.
+    migration: https://support.google.com/optimize/answer/12979939
+    since: '2026-09-28'
+
+  - id: google-sign-in-platform-library
+    provider: Google
+    title: The Google Sign-In platform library (gapi.auth2) is deprecated
+    severity: warning
+    effective: '2023-03-31'
+    patterns:
+      - 'apis\.google\.com/js/platform\.js'
+      - '\bgapi\.auth2\b'
+      - 'class=[''"]g-signin2\b'
+    examples:
+      - '<script src="https://apis.google.com/js/platform.js" async defer></script>'
+      - 'gapi.auth2.init({ client_id: CLIENT_ID });'
+    fix_hint: Migrate to Google Identity Services (accounts.google.com/gsi/client). New OAuth client IDs cannot use the old library.
+    migration: https://developers.google.com/identity/sign-in/web/deprecation-and-sunset
+    since: '2026-09-28'
+
+  - id: firebase-dynamic-links-shutdown
+    provider: Firebase
+    title: Firebase Dynamic Links is shut down (all links return 404)
+    severity: critical
+    effective: '2025-08-25'
+    patterns:
+      - '\b[\w-]+\.page\.link\b'
+      - 'firebasedynamiclinks\.googleapis\.com'
+      - '\bFirebaseDynamicLinks\b'
+      - 'firebase[-_]dynamic[-_]links'
+      - '\bdynamicLinks\(\)'
+    examples:
+      - 'const link = "https://myapp.page.link/promo";'
+      - 'implementation "com.google.firebase:firebase-dynamic-links:21.1.0"'
+      - 'import FirebaseDynamicLinks'
+    fix_hint: Replace with App Links / Universal Links (or a deep-linking provider) and update every published link.
+    migration: https://firebase.google.com/support/dynamic-links-faq
+    since: '2026-09-28'
+
+  - id: firebase-fcm-legacy-api-shutdown
+    provider: Firebase
+    title: FCM legacy HTTP/XMPP APIs are shut down
+    severity: critical
+    effective: '2024-07-22'
+    patterns:
+      - 'fcm\.googleapis\.com/fcm/send'
+      - '(?:gcm-http|android)\.googleapis\.com/gcm/send'
+      - '\.(?:sendToDevice|sendToDeviceGroup|sendToTopic|sendToCondition)\('
+    examples:
+      - 'requests.post("https://fcm.googleapis.com/fcm/send", headers=h, json=msg)'
+      - 'await admin.messaging().sendToDevice(token, payload);'
+    counter_examples:
+      - 'await admin.messaging().send(message);'
+    fix_hint: Use the FCM HTTP v1 API (projects/<id>/messages:send) with OAuth2, or messaging().send() in the Admin SDK.
+    migration: https://firebase.google.com/docs/cloud-messaging/send/v1-api
+    since: '2026-09-28'
+
+  - id: google-image-charts-shutdown
+    provider: Google
+    title: The Google Image Charts API (chart.googleapis.com/chart) is shut down
+    severity: critical
+    patterns:
+      - 'chart\.googleapis\.com/chart'
+    examples:
+      - '<img src="https://chart.googleapis.com/chart?cht=qr&chs=150x150&chl=hello">'
+    fix_hint: Render charts/QR codes client-side (Google Charts JS, Chart.js) or with a library.
+    migration: https://developers.google.com/chart/image
+    since: '2026-09-28'
+
+  # ───────────────────────────── Stripe ─────────────────────────────
+
+  - id: stripe-charges-api-deprecated
+    provider: Stripe
+    title: The Charges API is legacy and cannot handle SCA / 3D Secure
+    severity: warning
+    patterns:
+      - 'stripe\.charges\.create'
+      - 'stripe\.charges\.retrieve'
+      - 'Stripe::Charge\.create'
+      - '\\Stripe\\Charge::create'
+    examples:
+      - 'charge = stripe.charges.create(amount=1000, currency="eur")'
+      - 'Stripe::Charge.create(amount: 1000)'
+    fix_hint: Migrate to Payment Intents (stripe.paymentIntents.create); card payments needing authentication (EEA/SCA) are declined on Charges.
+    migration: https://docs.stripe.com/payments/payment-intents/migration
+    since: '2026-09-27'
 
   - id: stripe-sources-api-deprecated
     provider: Stripe
-    title: "The Sources API is deprecated"
+    title: The Sources API is deprecated
     severity: warning
     patterns:
-      - "stripe\\.sources\\.create"
-    fix_hint: "Migrate to Payment Methods (stripe.paymentMethods.create())."
-    migration: "https://docs.stripe.com/payments/payment-methods"
-    since: "2026-09-27"
+      - 'stripe\.sources\.create'
+      - 'stripe\.createSource\('
+    examples:
+      - 'stripe.sources.create(type="card", card=c)'
+      - 'const { source } = await stripe.createSource(card);'
+    fix_hint: Migrate to Payment Methods (stripe.paymentMethods.create()).
+    migration: https://docs.stripe.com/payments/payment-methods/transitioning
+    since: '2026-09-27'
 
-  - id: openai-text-davinci-003-shutdown
-    provider: OpenAI
-    title: "The text-davinci-003 model has been shut down"
-    severity: critical
-    patterns:
-      - "text-davinci-003"
-      - "code-davinci-002"
-    fix_hint: "Migrate to a recent model (gpt-4o, gpt-4o-mini) or a compatible one."
-    migration: "https://platform.openai.com/docs/deprecations"
-    since: "2026-09-27"
-
-  - id: github-oauth-password-grant
-    provider: GitHub
-    title: "The OAuth password grant flow is disabled"
-    severity: critical
-    patterns:
-      - "access_token\\?[^\"'\\s]*grant_type=password"
-    fix_hint: "Migrate to the device flow or the web application flow."
-    migration: "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps"
-    since: "2026-09-27"
-
-  - id: github-auth-token-header
-    provider: GitHub
-    title: "The 'Authorization: token' header is deprecated in favor of Bearer"
-    severity: info
-    patterns:
-      - "Authorization['\"]?\\s*[:=]\\s*['\"]?token\\s"
-    fix_hint: "Use 'Authorization: Bearer <token>' instead."
-    replace:
-      "token ": "Bearer "
-    migration: "https://github.blog/2021-04-05-behind-githubs-new-authentication-token-formats/"
-    since: "2026-09-27"
-
-  - id: slack-rtm-start-deprecated
-    provider: Slack
-    title: "rtm.start is deprecated — use rtm.connect"
+  - id: stripe-redirect-to-checkout-removed
+    provider: Stripe
+    title: stripe.redirectToCheckout() is removed from Stripe.js
     severity: warning
+    effective: '2025-09-30'
     patterns:
-      - "rtm\\.start"
-    fix_hint: "Call rtm.connect, then open the returned WebSocket."
-    migration: "https://api.slack.com/methods/rtm.connect"
-    since: "2026-09-27"
-
-  - id: slack-legacy-tokens
-    provider: Slack
-    title: "Legacy tokens (xoxp-/xoxo-) have been retired"
-    severity: critical
-    patterns:
-      - "xoxp-[A-Za-z0-9-]+"
-      - "xoxo-[A-Za-z0-9-]+"
-    fix_hint: "Create a new Slack app and use xoxb- tokens with minimal scopes."
-    migration: "https://api.slack.com/authentication/token-types"
-    since: "2026-09-27"
-
-  - id: twilio-lookups-v1-deprecated
-    provider: Twilio
-    title: "Lookups v1 API is deprecated in favor of v2"
-    severity: warning
-    patterns:
-      - "/v1/PhoneNumbers"
-      - "lookups\\.v1"
-    fix_hint: "Migrate to the Lookups v2 API."
-    migration: "https://www.twilio.com/docs/lookups/api"
-    since: "2026-09-27"
-
-  - id: openai-legacy-completions-endpoint
-    provider: OpenAI
-    title: "The legacy /completions endpoint is being phased out"
-    severity: warning
-    patterns:
-      - "openai\\.completions\\.create"
-      - "openai\\.Completion\\.create"
-    fix_hint: "Migrate to the Chat Completions API (client.chat.completions.create)."
-    migration: "https://platform.openai.com/docs/deprecations"
-    since: "2026-09-27"
-
-  - id: sendgrid-apikey-basic-auth
-    provider: SendGrid
-    title: "The v2 API (basic auth 'apikey') has been retired — use v3 Bearer"
-    severity: warning
-    patterns:
-      - "v2/mail/send"
-      - "sendgrid\\./v2"
-    fix_hint: "Migrate to the v3 API with 'Authorization: Bearer SG.…'."
-    migration: "https://docs.sendgrid.com/for-developers/sending-email/upgrade-your-authentication-method-to-api-keys"
-    since: "2026-09-27"
-
-  - id: aws-s3-path-style-deprecated
-    provider: AWS
-    title: "S3 path-style URLs are deprecated"
-    severity: info
-    patterns:
-      - "https://s3\\.amazonaws\\.com/"
-      - "https://[a-z0-9-]+\\.s3\\.amazonaws\\.com/"
-    fix_hint: "Migrate to virtual-hosted style (bucket.s3.region.amazonaws.com)."
-    migration: "https://aws.amazon.com/blogs/aws/amazon-s3-path-deprecation-plan-the-rest-of-the-story/"
-    since: "2026-09-27"
+      - '\.redirectToCheckout\('
+    examples:
+      - 'await stripe.redirectToCheckout({ sessionId: session.id });'
+    fix_hint: Return session.url from your server and redirect with window.location.href = session.url.
+    migration: https://docs.stripe.com/changelog/clover/2025-09-30/remove-redirect-to-checkout
+    since: '2026-09-28'
 
   - id: stripe-pinned-old-api-version
     provider: Stripe
-    title: "Stripe API version pinned to an old year"
+    title: Stripe API version pinned to a pre-2020 release
     severity: info
     patterns:
-      - "api_version[\"']?\\s*[:=]\\s*[\"']201[0-9]-"
-    fix_hint: "Pin a recent API version and test the upgrade."
-    migration: "https://docs.stripe.com/upgrades"
-    since: "2026-09-27"
+      - 'api_version[''"]?\s*[:=]\s*[''"]201[0-9]-'
+      - 'apiVersion[''"]?\s*:\s*[''"]201[0-9]-'
+    examples:
+      - 'stripe.api_version = "2019-12-03"'
+      - "const stripe = Stripe(key, { apiVersion: '2018-02-28' });"
+    fix_hint: Pin a recent API version and test the upgrade.
+    migration: https://docs.stripe.com/upgrades
+    since: '2026-09-27'
 
-  - id: twilio-basic-auth-url-credentials
-    provider: Twilio
-    title: "Twilio credentials in plain text inside the URL (AC…:token@)"
+  # ───────────────────────────── GitHub ─────────────────────────────
+
+  - id: github-oauth-password-grant
+    provider: GitHub
+    title: The OAuth password grant flow is disabled
+    severity: critical
+    patterns:
+      - 'access_token\?[^"''\s]*grant_type=password'
+    examples:
+      - '"https://github.com/login/oauth/access_token?client_id=x&grant_type=password"'
+    fix_hint: Migrate to the device flow or the web application flow.
+    migration: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps
+    since: '2026-09-27'
+
+  - id: github-oauth-authorizations-api-removed
+    provider: GitHub
+    title: The OAuth Authorizations API (/authorizations) was removed
+    severity: critical
+    effective: '2020-11-13'
+    patterns:
+      - 'api\.github\.com/authorizations\b'
+    examples:
+      - 'requests.post("https://api.github.com/authorizations", auth=(user, pw))'
+    fix_hint: Use the web application flow or the device flow to obtain tokens.
+    migration: https://developer.github.com/changes/2020-02-14-deprecating-oauth-auth-endpoint/
+    since: '2026-09-28'
+
+  - id: github-access-token-query-param-removed
+    provider: GitHub
+    title: Authenticating with ?access_token= in the URL is no longer supported
+    severity: critical
+    patterns:
+      - 'api\.github\.com/[^\s"''<>]*[?&]access_token='
+    examples:
+      - 'url = f"https://api.github.com/user/repos?access_token={token}"'
+    fix_hint: Send the token in the Authorization header instead.
+    migration: https://developer.github.com/changes/2020-02-10-deprecating-auth-through-query-param/
+    since: '2026-09-28'
+
+  - id: github-actions-artifact-v3-shutdown
+    provider: GitHub
+    title: actions/upload-artifact and download-artifact v1–v3 fail
+    severity: critical
+    effective: '2025-01-30'
+    files: ['.github/workflows/*']
+    patterns:
+      - 'actions/(?:upload|download)-artifact@v[123](?!\d)'
+    examples:
+      - '      - uses: actions/upload-artifact@v3'
+    counter_examples:
+      - '      - uses: actions/upload-artifact@v4'
+    fix_hint: Upgrade to v4. Artifacts become immutable and names must be unique per run — review the migration notes.
+    migration: https://github.blog/changelog/2024-04-16-deprecation-notice-v3-of-the-artifact-actions/
+    since: '2026-09-28'
+
+  - id: github-actions-cache-v1-v2-shutdown
+    provider: GitHub
+    title: actions/cache v1 and v2 no longer work
+    severity: critical
+    effective: '2025-02-01'
+    files: ['.github/workflows/*']
+    patterns:
+      - 'actions/cache@v[12](?![\d.])'
+      - 'actions/cache@v[12]\.[\d.]+'
+    examples:
+      - '      - uses: actions/cache@v2'
+    counter_examples:
+      - '      - uses: actions/cache@v4'
+    fix_hint: Upgrade to actions/cache@v4 (same inputs).
+    migration: https://github.blog/changelog/2024-12-05-notice-of-upcoming-releases-and-breaking-changes-for-github-actions/
+    replace:
+      'actions/cache@v1': 'actions/cache@v4'
+      'actions/cache@v2': 'actions/cache@v4'
+    since: '2026-09-28'
+
+  - id: github-actions-retired-runner-images
+    provider: GitHub
+    title: Retired GitHub-hosted runner image (jobs never start)
+    severity: critical
+    files: ['.github/workflows/*']
+    patterns:
+      - '\b(?:ubuntu-(?:16|18|20)\.04|windows-201[69]|macos-1[0-3])\b'
+    examples:
+      - '    runs-on: ubuntu-20.04'
+      - '        os: [ubuntu-latest, windows-2019, macos-13]'
+    counter_examples:
+      - '    runs-on: ubuntu-24.04'
+    fix_hint: Use ubuntu-24.04 / windows-2025 / macos-15 (or the -latest labels).
+    migration: https://github.com/actions/runner-images#available-images
+    since: '2026-09-28'
+
+  # ───────────────────────────── Slack ─────────────────────────────
+
+  - id: slack-files-upload-retired
+    provider: Slack
+    title: files.upload is retired
+    severity: critical
+    effective: '2025-11-12'
+    patterns:
+      - 'slack\.com/api/files\.upload\b'
+      - '\.files_upload\('
+      - '\b(?:client|web|slack|app)\.files\.upload\('
+    examples:
+      - 'client.files_upload(channels="#general", file="report.pdf")'
+      - 'await app.client.files.upload({ channels, file });'
+    counter_examples:
+      - 'client.files_upload_v2(channel=cid, file="report.pdf")'
+      - 'await client.files.uploadV2({ channel_id, file });'
+    fix_hint: Use files_upload_v2 / files.uploadV2 in the official SDKs (files.getUploadURLExternal + files.completeUploadExternal).
+    migration: https://docs.slack.dev/changelog/2024-04-a-better-way-to-upload-files-is-here-to-stay/
+    since: '2026-09-28'
+
+  - id: slack-legacy-conversation-methods
+    provider: Slack
+    title: channels.*, groups.*, im.* and mpim.* methods are retired
+    severity: critical
+    effective: '2021-02-24'
+    patterns:
+      - 'slack\.com/api/(?:channels|groups|im|mpim)\.\w+'
+      - 'api_call\(\s*[''"](?:channels|groups|im|mpim)\.'
+      - '\.(?:channels|groups|im|mpim)_(?:history|list|info|join|leave|create|mark|open|replies|setTopic|invite)\('
+      - '\b(?:client|web)\.(?:channels|groups|im|mpim)\.\w+\('
+    examples:
+      - 'client.channels_history(channel=cid)'
+      - 'await web.channels.list();'
+      - 'requests.get("https://slack.com/api/groups.history", params=p)'
+    counter_examples:
+      - 'client.conversations_history(channel=cid)'
+    fix_hint: Use the Conversations API (conversations.history, conversations.list…).
+    migration: https://api.slack.com/changelog/2020-01-deprecating-antecedents-to-the-conversations-api
+    since: '2026-09-28'
+
+  - id: slack-rtm-start-deprecated
+    provider: Slack
+    title: rtm.start is deprecated — use rtm.connect (or the Events API / Socket Mode)
     severity: warning
     patterns:
-      - "https://AC[0-9a-f]{32}:[^@\\s\"']+@"
-    fix_hint: "Use SDK-managed HTTP Basic auth — never embed credentials in the URL."
-    migration: "https://www.twilio.com/docs/iam/credentials/api"
-    since: "2026-09-27"
+      - '\brtm\.start\b'
+    examples:
+      - "rtm.start({ token: 'xoxb-demo' });"
+    fix_hint: Call rtm.connect and open the returned WebSocket; for new apps use Socket Mode.
+    migration: https://api.slack.com/methods/rtm.connect
+    since: '2026-09-27'
+
+  # ───────────────────────────── Twilio / SendGrid ─────────────────────────────
+
+  - id: twilio-programmable-video-eol
+    provider: Twilio
+    title: Twilio Programmable Video reaches end of life on 2026-12-05
+    severity: warning
+    effective: '2026-12-05'
+    patterns:
+      - '[''"]twilio-video[''"]'
+      - '\bTwilio\.Video\b'
+      - 'video\.twilio\.com'
+      - '\.video\.v1\.rooms\b'
+      - '\bTwilioVideo\b'
+    examples:
+      - 'import { connect } from "twilio-video";'
+      - 'room = client.video.v1.rooms.create(unique_name="demo")'
+    fix_hint: Plan the migration to another video provider before the end-of-life date.
+    migration: https://help.twilio.com/articles/20950630029595-Programmable-Video-End-of-Life-Notice
+    since: '2026-09-28'
+
+  - id: twilio-lookups-v1-deprecated
+    provider: Twilio
+    title: Lookup v1 is superseded by Lookup v2
+    severity: info
+    patterns:
+      - 'lookups\.twilio\.com/v1/'
+      - '\blookups\.v1\b'
+    examples:
+      - 'client.lookups.v1.phoneNumbers("+15108675310").fetch()'
+    fix_hint: Migrate to the Lookup v2 API (lookups.v2.phoneNumbers).
+    migration: https://www.twilio.com/docs/lookup/v2-api
+    since: '2026-09-27'
+
+  - id: sendgrid-v2-api
+    provider: SendGrid
+    title: The v2 Web API with username/password (api_user) is retired
+    severity: warning
+    patterns:
+      - 'api\.sendgrid\.com/api/mail\.send'
+      - '\bapi_user='
+    examples:
+      - 'requests.post("https://api.sendgrid.com/api/mail.send.json", data=d)'
+    fix_hint: "Use the v3 Mail Send API (/v3/mail/send) with 'Authorization: Bearer SG.…'."
+    migration: https://www.twilio.com/docs/sendgrid/for-developers/sending-email/upgrade-your-authentication-method-to-api-keys
+    since: '2026-09-27'
+
+  # ───────────────────────────── AWS ─────────────────────────────
+
+  - id: aws-sdk-js-v2-end-of-support
+    provider: AWS
+    title: AWS SDK for JavaScript v2 (aws-sdk) reached end of support
+    severity: warning
+    effective: '2025-09-08'
+    patterns:
+      - '[''"]aws-sdk(?:/[\w/.-]+)?[''"]'
+    examples:
+      - "const AWS = require('aws-sdk');"
+      - 'import S3 from "aws-sdk/clients/s3";'
+      - '"aws-sdk": "^2.1500.0",'
+    counter_examples:
+      - 'import { S3Client } from "@aws-sdk/client-s3";'
+    fix_hint: Migrate to the modular v3 clients (@aws-sdk/client-*). aws-sdk-js-codemod automates most of it.
+    migration: https://aws.amazon.com/blogs/developer/announcing-end-of-support-for-aws-sdk-for-javascript-v2/
+    since: '2026-09-28'
+
+  - id: aws-lambda-deprecated-runtimes
+    provider: AWS
+    title: Deprecated AWS Lambda runtime (no patches; updates get blocked)
+    severity: warning
+    patterns:
+      - '[Rr]untime[''"]?\s*[:=]\s*[''"]?(?:nodejs(?:\d|1[0-8])(?:\.\d+|\.x)?|python(?:2\.7|3\.[6-9])|dotnetcore[1-3]\.\d|ruby2\.[57]|go1\.x|java8)(?![\w.])'
+      - '\bRuntime\.(?:NODEJS_(?:1[0-8]|[4-9])_X|PYTHON_3_[6-9]|PYTHON_2_7|GO_1_X|DOTNET_CORE_[1-3]\w*|RUBY_2_[57])\b'
+    examples:
+      - '      Runtime: python3.9'
+      - '  runtime       = "nodejs18.x"'
+      - 'runtime: lambda.Runtime.NODEJS_16_X,'
+    counter_examples:
+      - '      Runtime: python3.12'
+      - '  runtime       = "nodejs22.x"'
+      - 'FROM python:3.9-slim'
+    fix_hint: Move to a supported runtime (nodejs22.x, python3.12+, provided.al2023 for Go).
+    migration: https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html#runtimes-deprecated
+    since: '2026-09-28'
+
+  - id: aws-s3-path-style-deprecated
+    provider: AWS
+    title: S3 path-style URLs are deprecated (unsupported for buckets created after 2020-09-30)
+    severity: info
+    patterns:
+      - 'https?://s3(?:[.-][a-z0-9-]+)?\.amazonaws\.com/[a-z0-9][a-z0-9.-]+/'
+    examples:
+      - 'url = "https://s3.amazonaws.com/my-bucket/key.png"'
+      - 'url = "https://s3.eu-west-1.amazonaws.com/my-bucket/key.png"'
+    counter_examples:
+      - 'url = "https://my-bucket.s3.amazonaws.com/key.png"'
+      - 'url = "https://my-bucket.s3.eu-west-1.amazonaws.com/key.png"'
+    fix_hint: Use virtual-hosted style URLs (https://<bucket>.s3.<region>.amazonaws.com/<key>).
+    migration: https://aws.amazon.com/blogs/aws/amazon-s3-path-deprecation-plan-the-rest-of-the-story/
+    since: '2026-09-27'
+
+  # ───────────────────────────── Microsoft ─────────────────────────────
+
+  - id: azure-ad-graph-retired
+    provider: Microsoft
+    title: Azure AD Graph (graph.windows.net) is retired
+    severity: critical
+    effective: '2025-08-31'
+    patterns:
+      - 'graph\.windows\.net'
+      - 'Microsoft\.Azure\.ActiveDirectory\.GraphClient'
+      - '(?<![\w-])azure-graphrbac\b'
+    examples:
+      - 'GRAPH = "https://graph.windows.net/myorg/users?api-version=1.6"'
+    fix_hint: Migrate to Microsoft Graph (graph.microsoft.com).
+    migration: https://learn.microsoft.com/en-us/graph/migrate-azure-ad-graph-overview
+    since: '2026-09-28'
+
+  - id: microsoft-adal-end-of-support
+    provider: Microsoft
+    title: ADAL authentication libraries are out of support
+    severity: warning
+    effective: '2023-06-30'
+    patterns:
+      - '[''"](?:adal-node|adal-angular[\w-]*|react-adal|adal)[''"]'
+      - '(?m)^\s*(?:import adal\b|from adal import)'
+      - 'Microsoft\.IdentityModel\.Clients\.ActiveDirectory'
+      - 'com\.microsoft\.aad:adal4j'
+    examples:
+      - "const adal = require('adal-node');"
+      - 'import adal'
+      - 'using Microsoft.IdentityModel.Clients.ActiveDirectory;'
+    counter_examples:
+      - 'import msal'
+    fix_hint: Migrate to MSAL (msal, @azure/msal-node, Microsoft.Identity.Client).
+    migration: https://learn.microsoft.com/en-us/entra/identity-platform/msal-migration
+    since: '2026-09-28'
+
+  # ───────────────────────────── Meta ─────────────────────────────
+
+  - id: instagram-basic-display-shutdown
+    provider: Meta
+    title: The Instagram Basic Display API is shut down
+    severity: critical
+    effective: '2024-12-04'
+    patterns:
+      - 'scope=user_profile'
+      - '[''"]user_profile,user_media[''"]'
+    examples:
+      - 'auth_url = f"https://api.instagram.com/oauth/authorize?client_id={cid}&scope=user_profile,user_media"'
+    fix_hint: Switch to the Instagram API with Instagram Login (requires a Professional account).
+    migration: https://developers.facebook.com/blog/post/2024/09/04/update-on-instagram-basic-display-api/
+    since: '2026-09-28'
+
+  # ───────────────────────────── Data & misc ─────────────────────────────
+
+  - id: mongodb-atlas-app-services-shutdown
+    provider: MongoDB
+    title: Atlas Data API, App Services and Device Sync are shut down
+    severity: critical
+    effective: '2025-09-30'
+    patterns:
+      - '\bdata\.mongodb-api\.com'
+      - '/endpoint/data/v1/action/'
+      - '[''"]realm-web[''"]'
+      - '\bRealm\.App\('
+    examples:
+      - 'url = "https://data.mongodb-api.com/app/data-abc/endpoint/data/v1/action/find"'
+      - 'import * as Realm from "realm-web";'
+    fix_hint: Query Atlas through a driver behind your own API; replace Device Sync with another sync solution.
+    migration: https://www.mongodb.com/docs/atlas/app-services/deprecation/
+    since: '2026-09-28'
+
+  - id: darksky-api-shutdown
+    provider: Apple
+    title: The Dark Sky API is shut down
+    severity: critical
+    effective: '2023-03-31'
+    patterns:
+      - 'api\.darksky\.net'
+      - 'api\.forecast\.io'
+    examples:
+      - 'url = f"https://api.darksky.net/forecast/{key}/{lat},{lon}"'
+    fix_hint: Use Apple WeatherKit or another weather API.
+    migration: https://developer.apple.com/weatherkit/get-started/
+    since: '2026-09-28'
+
+  - id: iex-cloud-shutdown
+    provider: IEX
+    title: IEX Cloud is shut down
+    severity: critical
+    effective: '2024-08-31'
+    patterns:
+      - '\b(?:cloud|sandbox)\.iexapis\.com'
+    examples:
+      - 'BASE = "https://cloud.iexapis.com/stable"'
+    fix_hint: Move to another market-data provider.
+    migration: https://en.wikipedia.org/wiki/Investors_Exchange
+    since: '2026-09-28'
+
+  - id: yahoo-yql-shutdown
+    provider: Yahoo
+    title: YQL (query.yahooapis.com) is shut down
+    severity: critical
+    effective: '2019-01-03'
+    patterns:
+      - 'query\.yahooapis\.com'
+    examples:
+      - 'url = "https://query.yahooapis.com/v1/public/yql?q=" + q'
+    fix_hint: Use the underlying data source directly; YQL has no replacement.
+    migration: https://developer.yahoo.com/yql/
+    since: '2026-09-28'

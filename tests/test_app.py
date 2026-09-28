@@ -77,7 +77,7 @@ def test_filter_findings():
     cfg = RepoConfig(mode="issue", min_severity="critical")
     filtered = filter_findings(findings, cfg)
     assert all(f.rule.severity == "critical" for f in filtered)
-    assert len(filtered) == 6
+    assert len(filtered) == 7
 
 
 # ---------- Pipeline (GitHub mocké) ----------
@@ -114,7 +114,7 @@ def test_pipeline_issue_mode(tmp_path, monkeypatch):
         run_scan_pipeline(fake, rules, 1, "owner", "repo")
     )
     assert result["status"] == "issue_opened"
-    assert result["findings"] == 8
+    assert result["findings"] == 12
     assert len(fake.issues) == 1
     assert "DriftGuard" in fake.issues[0]["body"]
     assert "stripe.charges.create" in fake.issues[0]["body"]
@@ -173,10 +173,10 @@ def test_pipeline_pr_mode(tmp_path, monkeypatch):
     monkeypatch.setattr(storage, "DB_PATH", tmp_path / "test.sqlite")
     repo_dir = tmp_path / "repo"
     repo_dir.mkdir()
-    (repo_dir / "gh.py").write_text(
-        "headers = {'Authorization': 'token ghp_x'}\n", encoding="utf-8"
-    )
-    (repo_dir / ".driftguard.yml").write_text("mode: pr\nmin_severity: info\n", encoding="utf-8")
+    wf = repo_dir / ".github" / "workflows"
+    wf.mkdir(parents=True)
+    (wf / "ci.yml").write_text("steps:\n  - uses: actions/cache@v2\n", encoding="utf-8")
+    (repo_dir / ".driftguard.yml").write_text("mode: pr\n", encoding="utf-8")
 
     rules = load_rules(RULES_FILE)
     fake = FakeGitHubApp(repo_dir)
@@ -184,7 +184,9 @@ def test_pipeline_pr_mode(tmp_path, monkeypatch):
     result = asyncio.run(run_scan_pipeline(fake, rules, 1, "owner", "repo"))
     assert result["status"] == "pr_opened"
     assert len(fake.prs) == 1
-    assert fake.prs[0]["changes"] == [("gh.py", "headers = {'Authorization': 'Bearer ghp_x'}\n")]
+    assert fake.prs[0]["changes"] == [
+        (str(Path(".github/workflows/ci.yml")), "steps:\n  - uses: actions/cache@v4\n")
+    ]
 
 
 def test_pipeline_pr_mode_falls_back_to_issue(tmp_path, monkeypatch):
@@ -204,32 +206,34 @@ def test_pipeline_pr_mode_falls_back_to_issue(tmp_path, monkeypatch):
     assert fake.prs == []
 
 
+def _workflow(root: Path, content: bytes) -> str:
+    wf = root / ".github" / "workflows"
+    wf.mkdir(parents=True, exist_ok=True)
+    (wf / "ci.yml").write_bytes(content)
+    return str(Path(".github/workflows/ci.yml"))
+
+
 def test_apply_fixes(tmp_path):
     rules = load_rules(RULES_FILE)
-    repo = tmp_path / "repo"
-    repo.mkdir()
-    (repo / "app.py").write_text(
-        "a = {'Authorization': 'token x'}\nkeep = 1\nb = {'Authorization': 'token y'}\n",
-        encoding="utf-8",
-    )
-    findings, _ = scan_repo(repo, rules)
-    changes = apply_fixes(repo, findings)
-    assert changes == [
-        ("app.py", "a = {'Authorization': 'Bearer x'}\nkeep = 1\nb = {'Authorization': 'Bearer y'}\n")
+    rel = _workflow(tmp_path, b"steps:\n  - uses: actions/cache@v1\n  - run: make\n"
+                              b"  - uses: actions/cache@v2\n")
+    findings, _ = scan_repo(tmp_path, rules)
+    assert apply_fixes(tmp_path, findings) == [
+        (rel, "steps:\n  - uses: actions/cache@v4\n  - run: make\n  - uses: actions/cache@v4\n")
     ]
 
 
 def test_apply_fixes_preserves_crlf(tmp_path):
     rules = load_rules(RULES_FILE)
-    (tmp_path / "app.py").write_bytes(b"keep = 1\r\nh = {'Authorization': 'token x'}\r\n")
+    _workflow(tmp_path, b"steps:\r\n  - uses: actions/cache@v2\r\n")
     findings, _ = scan_repo(tmp_path, rules)
     [(_, content)] = apply_fixes(tmp_path, findings)
-    assert content == "keep = 1\r\nh = {'Authorization': 'Bearer x'}\r\n"
+    assert content == "steps:\r\n  - uses: actions/cache@v4\r\n"
 
 
 def test_apply_fixes_skips_non_utf8(tmp_path):
     rules = load_rules(RULES_FILE)
-    (tmp_path / "app.py").write_bytes(b"# caf\xe9\nh = {'Authorization': 'token x'}\n")
+    _workflow(tmp_path, b"# caf\xe9\n  - uses: actions/cache@v2\n")
     findings, _ = scan_repo(tmp_path, rules)
     assert findings  # detected…
     assert apply_fixes(tmp_path, findings) == []  # …but never rewritten lossily

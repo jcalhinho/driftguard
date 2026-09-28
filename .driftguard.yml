@@ -1,0 +1,7 @@
+# DriftGuard's own repo: fixtures, rule examples and docs mention deprecated APIs on purpose.
+ignore_paths:
+  - tests/**
+  - driftguard/data/**
+  - bench/**
+  - "*.md"
+  - docs/**

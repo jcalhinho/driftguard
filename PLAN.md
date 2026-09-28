@@ -62,7 +62,7 @@ Plan date: 2026-09-27 · Author: jcalhinho · Status: phases 0-1 code complete
 
 ```
 driftguard/
-├── engine/              # Open-source engine (Python)
+├── driftguard/          # Open-source engine + CLI (Python)
 │   ├── scanner.py       # Codebase scan: API usage (regex + context)
 │   ├── rules.py         # YAML rules loading/validation
 │   ├── fixer.py         # Fix patch generation

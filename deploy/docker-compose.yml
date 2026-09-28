@@ -4,7 +4,7 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"  # reach it through a reverse proxy or tunnel
     environment:
       - GITHUB_APP_PRIVATE_KEY_PATH=/app/driftguard-key.pem
       - DRIFTGUARD_DB=/data/driftguard.sqlite

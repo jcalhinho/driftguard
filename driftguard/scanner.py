@@ -4,6 +4,7 @@ import os
 import re
 from bisect import bisect_right
 from dataclasses import dataclass
+from fnmatch import fnmatch
 from pathlib import Path
 
 from .rules import Rule
@@ -11,6 +12,7 @@ from .rules import Rule
 SKIP_DIRS = {
     ".git", "node_modules", ".venv", "venv", "env", "dist", "build", "out",
     "__pycache__", ".idea", ".vscode", ".driftguard", ".next", "vendor", "target",
+    "site-packages", "coverage", ".terraform",
 }
 MAX_FILE_SIZE = 2 * 1024 * 1024  # 2 MB
 COMMENT_MARKERS = ("#", "//", "*", "/*", "<!--", "REM ")
@@ -45,7 +47,9 @@ def scan_repo(path, rules: list[Rule]) -> tuple[list[Finding], int]:
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [
             d for d in dirnames
-            if d not in SKIP_DIRS and (not d.startswith(".") or d in SCANNED_DOT_DIRS)
+            if d not in SKIP_DIRS
+            and not d.endswith(".egg-info")
+            and (not d.startswith(".") or d in SCANNED_DOT_DIRS)
         ]
         for name in sorted(filenames):
             full = Path(dirpath) / name
@@ -69,8 +73,12 @@ def scan_repo(path, rules: list[Rule]) -> tuple[list[Finding], int]:
             files_scanned += 1
 
             rel = str(full.relative_to(root))
+            posix_rel = full.relative_to(root).as_posix()
+            applicable = [
+                r for r in rules if not r.files or any(fnmatch(posix_rel, g) for g in r.files)
+            ]
             lines = newlines = None
-            for rule in rules:
+            for rule in applicable:
                 for regex in rule.compiled:
                     for m in regex.finditer(text):
                         if newlines is None:  # only computed for files that match

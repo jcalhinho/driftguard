@@ -65,15 +65,15 @@ def scan_result():
 
 def test_scan_counts(scan_result):
     findings, files_scanned = scan_result
-    assert files_scanned == 4
-    # 4 (app.py) + 2 (payments.js) + 1 (config.py) + 1 (github_flow.py)
-    assert len(findings) == 8
+    assert files_scanned == 5
+    # 4 (app.py) + 3 (payments.js) + 2 (config.py) + 1 (github_flow.py) + 2 (ci.yml)
+    assert len(findings) == 12
 
 
 def test_scan_critical_count(scan_result):
     findings, _ = scan_result
     criticals = [f for f in findings if f.rule.severity == "critical"]
-    assert len(criticals) == 6
+    assert len(criticals) == 7
 
 
 def test_scan_comment_flag(scan_result):
@@ -88,7 +88,8 @@ def test_scan_lines(scan_result):
     by_file_line = {(f.file, f.line) for f in findings}
     assert ("app.py", 8) in by_file_line  # stripe.charges.create
     assert ("payments.js", 4) in by_file_line  # stripe.charges.create
-    assert ("config.py", 2) in by_file_line  # xoxp-
+    assert ("config.py", 2) in by_file_line  # retired Claude model
+    assert (str(Path(".github/workflows/ci.yml")), 5) in by_file_line  # actions/cache@v2
     assert ("github_flow.py", 3) in by_file_line  # OAuth password grant
 
 
@@ -106,16 +107,12 @@ def test_scan_skips_git_dir(tmp_path):
 
 # ---------- Fixer ----------
 
-def test_fixer_replace(tmp_path):
-    rules = load_rules(RULES_FILE)
-    (tmp_path / "gh.py").write_text(
-        "headers = {'Authorization': 'token ghp_x'}\n", encoding="utf-8"
-    )
-    findings, _ = scan_repo(tmp_path, rules)
-    target = next(f for f in findings if f.rule.id == "github-auth-token-header")
+def test_fixer_replace(scan_result):
+    findings, _ = scan_result
+    target = next(f for f in findings if f.rule.id == "github-actions-cache-v1-v2-shutdown")
     fix = build_fix(target)
     assert fix["action"] == "replace"
-    assert "Bearer " in fix["new"]
+    assert fix["new"] == "actions/cache@v4"
 
 
 def test_fixer_no_unsafe_replacement(scan_result):
@@ -127,7 +124,7 @@ def test_fixer_no_unsafe_replacement(scan_result):
 
 def test_fixer_manual(scan_result):
     findings, _ = scan_result
-    target = next(f for f in findings if f.rule.id == "slack-legacy-tokens")
+    target = next(f for f in findings if f.rule.id == "anthropic-retired-models")
     fix = build_fix(target)
     assert fix["action"] == "manual"
     assert fix["migration"].startswith("https://")
@@ -138,8 +135,8 @@ def test_fixer_manual(scan_result):
 def test_json_report(scan_result):
     findings, files = scan_result
     data = json.loads(to_json(FIXTURE, findings, files))
-    assert data["scanned_files"] == 4
-    assert len(data["findings"]) == 8
+    assert data["scanned_files"] == 5
+    assert len(data["findings"]) == 12
     assert data["findings"][0]["rule_id"]
     assert "fix_hint" in data["findings"][0]
 
@@ -170,13 +167,13 @@ def test_cli_scan_text():
 def test_cli_scan_json():
     result = run_cli("scan", str(FIXTURE), "--format", "json")
     data = json.loads(result.stdout)
-    assert len(data["findings"]) == 8
+    assert len(data["findings"]) == 12
 
 
 def test_cli_min_severity():
     result = run_cli("scan", str(FIXTURE), "--format", "json", "--min-severity", "critical")
     data = json.loads(result.stdout)
-    assert len(data["findings"]) == 6
+    assert len(data["findings"]) == 7
 
 
 def test_cli_only_provider():
@@ -206,9 +203,9 @@ def test_scan_includes_github_workflows(tmp_path):
     rules = load_rules(RULES_FILE)
     wf = tmp_path / ".github" / "workflows"
     wf.mkdir(parents=True)
-    (wf / "ci.yml").write_text("run: curl https://s3.amazonaws.com/b/k\n", encoding="utf-8")
+    (wf / "ci.yml").write_text("run: curl https://s3.amazonaws.com/bucket/k\n", encoding="utf-8")
     (tmp_path / ".cache").mkdir()
-    (tmp_path / ".cache" / "x.py").write_text("https://s3.amazonaws.com/b/k\n", encoding="utf-8")
+    (tmp_path / ".cache" / "x.py").write_text("https://s3.amazonaws.com/bucket/k\n", encoding="utf-8")
     findings, _ = scan_repo(tmp_path, rules)
     assert [f.file for f in findings] == [str(Path(".github/workflows/ci.yml"))]
 
@@ -251,3 +248,54 @@ def test_cli_github_format():
     first = result.stdout.splitlines()[0]
     assert first.startswith("::")
     assert "file=" in first and ",line=" in first
+
+
+# ---------- Rules base quality ----------
+
+ALL_RULES = load_rules(RULES_FILE)
+
+
+def _scan_snippet(tmp_path, rule, code):
+    """Scan one line of code with a single rule, in a file the rule applies to."""
+    rel = rule.files[0].replace("*", "ci.yml") if rule.files else "snippet.txt"
+    target = tmp_path / rel
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(code + "\n", encoding="utf-8")
+    findings, _ = scan_repo(tmp_path, [rule])
+    target.unlink()
+    return findings
+
+
+@pytest.mark.parametrize("rule", ALL_RULES, ids=lambda r: r.id)
+def test_rule_metadata(rule):
+    assert rule.examples, "every rule needs at least one example"
+    assert rule.fix_hint
+    assert rule.migration.startswith("https://")
+
+
+@pytest.mark.parametrize("rule", ALL_RULES, ids=lambda r: r.id)
+def test_rule_examples_match(rule, tmp_path):
+    for example in rule.examples:
+        assert _scan_snippet(tmp_path, rule, example), f"not detected: {example!r}"
+
+
+@pytest.mark.parametrize(
+    "rule", [r for r in ALL_RULES if r.counter_examples], ids=lambda r: r.id
+)
+def test_rule_counter_examples_do_not_match(rule, tmp_path):
+    for example in rule.counter_examples:
+        assert not _scan_snippet(tmp_path, rule, example), f"false positive: {example!r}"
+
+
+def test_files_restriction(tmp_path):
+    rule = next(r for r in ALL_RULES if r.id == "github-actions-retired-runner-images")
+    (tmp_path / "README.md").write_text("We test on ubuntu-20.04.\n", encoding="utf-8")
+    assert scan_repo(tmp_path, [rule])[0] == []
+
+
+def test_fixer_version_bump_is_exact(tmp_path):
+    rule = next(r for r in ALL_RULES if r.id == "github-actions-cache-v1-v2-shutdown")
+    exact = _scan_snippet(tmp_path, rule, "- uses: actions/cache@v2")
+    assert build_fix(exact[0])["new"] == "actions/cache@v4"
+    pinned = _scan_snippet(tmp_path, rule, "- uses: actions/cache@v2.1.6")
+    assert build_fix(pinned[0])["action"] == "manual"  # never "@v4.1.6"

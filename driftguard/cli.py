@@ -15,6 +15,20 @@ from .report import to_github, to_json, to_text
 from .rules import DEFAULT_RULES_FILE, RulesError, load_rules
 from .scanner import scan_repo
 
+ICONS = {"critical": "🔴 critical", "warning": "🟠 warning", "info": "🔵 info"}
+
+
+def rules_markdown(rules) -> str:
+    """Rules table for the README (regenerate with `driftguard rules --format markdown`)."""
+    lines = ["| Provider | Breaking change | Severity | Effective |", "|---|---|---|---|"]
+    for r in sorted(rules, key=lambda r: (r.provider.lower(), -SEVERITY_RANK[r.severity], r.id)):
+        title = r.title.replace("|", "\\|")
+        lines.append(
+            f"| {r.provider} | [{title}]({r.migration}) | {ICONS[r.severity]} "
+            f"| {r.effective or '—'} |"
+        )
+    return "\n".join(lines)
+
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
@@ -40,7 +54,9 @@ def main(argv=None) -> int:
         "--no-fail", action="store_true", help="Always exit 0 (report only)",
     )
 
-    sub.add_parser("rules", help="List the loaded rules")
+    rules_cmd = sub.add_parser("rules", help="List the loaded rules")
+    rules_cmd.add_argument("--rules", default=str(DEFAULT_RULES_FILE), help="YAML rules file")
+    rules_cmd.add_argument("--format", choices=["text", "markdown"], default="text")
 
     args = parser.parse_args(argv)
 
@@ -51,6 +67,9 @@ def main(argv=None) -> int:
         return 2
 
     if args.command == "rules":
+        if args.format == "markdown":
+            print(rules_markdown(rules))
+            return 0
         for r in rules:
             print(f"[{r.severity:8}] {r.id} ({r.provider}) — {r.title}")
         return 0
