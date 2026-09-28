@@ -9,6 +9,8 @@
 # severity:         critical = requests fail today · warning = sunset announced / unsupported
 #                   SDK · info = legacy, worth planning
 # effective:        date the shutdown/deprecation took (or takes) effect (YYYY-MM-DD)
+# shutdown:         (optional) date requests start failing — a `warning` rule is reported
+#                   as `critical` from that day on, automatically
 # patterns:         Python regexes detecting the affected usage (one or more)
 # files:            (optional) path globs the rule is restricted to
 # examples:         code lines that MUST match (enforced by the test suite)
@@ -676,6 +678,7 @@ rules:
     title: Twilio Programmable Video reaches end of life on 2026-12-05
     severity: warning
     effective: '2026-12-05'
+    shutdown: '2026-12-05'
     patterns:
       - '[''"]twilio-video[''"]'
       - '\bTwilio\.Video\b'

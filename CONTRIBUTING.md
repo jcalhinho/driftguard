@@ -11,6 +11,7 @@ entry in [driftguard/data/rules.yaml](./driftguard/data/rules.yaml), no Python.
   title: gpt-4-32k models are shut down
   severity: critical                     # critical | warning | info (see below)
   effective: '2025-06-06'                # when the change took / takes effect upstream
+  shutdown: '2025-06-06'                 # optional: a `warning` becomes `critical` that day
   patterns:                              # Python regexes, single-quoted ('' for a quote)
     - '\bgpt-4-32k(?:-\d{4})?\b'
   files: ['.github/workflows/*']         # optional: restrict to matching paths

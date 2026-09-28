@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import logging
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
@@ -16,6 +17,10 @@ from . import storage
 from .github_app import GitHubApp, GitHubAppError
 from .pipeline import run_scan_pipeline
 
+logging.basicConfig(
+    level=os.getenv("DRIFTGUARD_LOG_LEVEL", "INFO"),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 log = logging.getLogger("driftguard")
 
 app = FastAPI(title="DriftGuard", version="0.2.0")
@@ -23,13 +28,16 @@ app = FastAPI(title="DriftGuard", version="0.2.0")
 RULES_FILE = Path(os.getenv("DRIFTGUARD_RULES", str(DEFAULT_RULES_FILE)))
 
 _rules = None
+_rules_day = None
 _gh_app: GitHubApp | None = None
 
 
 def get_rules():
-    global _rules
-    if _rules is None:
-        _rules = load_rules(RULES_FILE)
+    """Reloaded once a day: rules whose shutdown date has passed escalate to critical."""
+    global _rules, _rules_day
+    today = datetime.now(timezone.utc).date()
+    if _rules is None or _rules_day != today:
+        _rules, _rules_day = load_rules(RULES_FILE, today=today), today
     return _rules
 
 

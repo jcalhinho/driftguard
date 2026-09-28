@@ -299,3 +299,15 @@ def test_fixer_version_bump_is_exact(tmp_path):
     assert build_fix(exact[0])["new"] == "actions/cache@v4"
     pinned = _scan_snippet(tmp_path, rule, "- uses: actions/cache@v2.1.6")
     assert build_fix(pinned[0])["action"] == "manual"  # never "@v4.1.6"
+
+
+def test_shutdown_date_escalates_to_critical(tmp_path):
+    from datetime import date
+    f = tmp_path / "r.yaml"
+    f.write_text(
+        "rules:\n  - id: x\n    provider: P\n    title: t\n    severity: warning\n"
+        "    shutdown: '2026-12-05'\n    patterns: ['foo']\n",
+        encoding="utf-8",
+    )
+    assert load_rules(f, today=date(2026, 12, 4))[0].severity == "warning"
+    assert load_rules(f, today=date(2026, 12, 5))[0].severity == "critical"
