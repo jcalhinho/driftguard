@@ -30,7 +30,8 @@ sudo usermod -aG docker $USER && newgrp docker
 ```bash
 git clone https://github.com/jcalhinho/driftguard.git
 cd driftguard
-cp deploy/driftguard-key.pem .          # upload your private key to the VM (scp)
+# Upload your private key to the VM:
+#   scp driftguard-key.pem USER@IP:~/driftguard/deploy/driftguard-key.pem
 cp app/.env.example app/.env            # then edit: App ID + webhook secret
 ```
 
@@ -38,7 +39,6 @@ Edit `app/.env`:
 
 ```
 GITHUB_APP_ID=5105596
-GITHUB_APP_PRIVATE_KEY_PATH=./driftguard-key.pem
 GITHUB_WEBHOOK_SECRET=<generated: openssl rand -hex 32>
 ```
 

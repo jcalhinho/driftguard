@@ -1,10 +1,13 @@
 """SQLite storage: installations, repos, already-reported findings (dedup)."""
 
+import os
 import sqlite3
 import time
 from pathlib import Path
 
-DB_PATH = Path(__file__).resolve().parent / "driftguard.sqlite"
+DB_PATH = Path(
+    os.getenv("DRIFTGUARD_DB", str(Path(__file__).resolve().parent / "driftguard.sqlite"))
+)
 
 
 def _conn() -> sqlite3.Connection:

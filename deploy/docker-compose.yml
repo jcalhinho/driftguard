@@ -8,9 +8,11 @@ services:
     environment:
       - GITHUB_APP_ID=${GITHUB_APP_ID}
       - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+      - GITHUB_APP_PRIVATE_KEY_PATH=/app/driftguard-key.pem
+      - DRIFTGUARD_DB=/data/driftguard.sqlite
     volumes:
       - ./driftguard-key.pem:/app/driftguard-key.pem:ro
-      - driftguard-data:/app/app
+      - driftguard-data:/data
     env_file:
       - ../app/.env
 
