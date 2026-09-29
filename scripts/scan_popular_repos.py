@@ -27,7 +27,7 @@ import httpx
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from driftguard.rules import load_rules
-from driftguard.scanner import scan_directory
+from driftguard.scanner import scan_repo
 
 GITHUB_API = "https://api.github.com"
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
@@ -128,16 +128,16 @@ def download_and_scan(repo: dict, rules: list) -> dict:
                     return result
 
                 scan_dir = extracted[0]
-                findings, files_scanned = scan_directory(str(scan_dir), rules)
+                findings, files_scanned = scan_repo(str(scan_dir), rules)
                 result["findings"] = [
                     {
-                        "rule_id": f.rule_id,
-                        "provider": f.provider,
-                        "title": f.title,
-                        "severity": f.severity,
+                        "rule_id": f.rule.id,
+                        "provider": f.rule.provider,
+                        "title": f.rule.title,
+                        "severity": f.rule.severity,
                         "file": f.file,
                         "line": f.line,
-                        "match": f.match,
+                        "match": f.context,
                     }
                     for f in findings
                 ]
@@ -165,7 +165,7 @@ def main():
     repos = fetch_top_repos(args.limit)
     print(f"Got {len(repos)} repos. Loading rules…")
 
-    rules = load_rules()
+    rules = load_rules(Path(__file__).resolve().parent.parent / "driftguard" / "data" / "rules.yaml")
     print(f"Loaded {len(rules)} rules. Starting scan with {args.workers} workers…")
 
     all_results = []

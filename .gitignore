@@ -23,3 +23,5 @@ bench/rust-scanner/target/
 
 # Claude Code local settings
 .claude/settings.local.json
+scan_results.json
+scan_results.md
