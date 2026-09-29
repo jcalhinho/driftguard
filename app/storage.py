@@ -12,7 +12,9 @@ DB_PATH = Path(
 
 
 def _conn() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=30000")
     conn.execute(
         "CREATE TABLE IF NOT EXISTS installations ("
         "id INTEGER PRIMARY KEY, account TEXT, created_at REAL)"

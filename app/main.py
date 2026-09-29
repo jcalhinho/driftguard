@@ -57,22 +57,28 @@ def get_github_app() -> GitHubApp:
 
 # One scan at a time per repo: two quick pushes must not open two identical issues.
 _repo_locks: dict[str, asyncio.Lock] = {}
+# Global concurrency limit: prevent a flood of webhooks from spawning unlimited scans.
+_scan_semaphore = asyncio.Semaphore(5)
 
 
 async def scan_in_background(
     installation_id: int, owner: str, repo: str, branch: str | None = None
 ):
-    lock = _repo_locks.setdefault(f"{owner}/{repo}", asyncio.Lock())
-    async with lock:
-        try:
-            result = await run_scan_pipeline(
-                get_github_app(), get_rules(), installation_id, owner, repo, branch
-            )
-            log.info("scan %s/%s: %s", owner, repo, result)
-        except GitHubAppError as e:
-            log.warning("scan %s/%s failed: %s", owner, repo, e)
-        except Exception:
-            log.exception("scan %s/%s crashed", owner, repo)
+    async with _scan_semaphore:
+        lock = _repo_locks.setdefault(f"{owner}/{repo}", asyncio.Lock())
+        async with lock:
+            try:
+                result = await run_scan_pipeline(
+                    get_github_app(), get_rules(), installation_id, owner, repo, branch
+                )
+                log.info("scan %s/%s: %s", owner, repo, result)
+            except GitHubAppError as e:
+                log.warning("scan %s/%s failed: %s", owner, repo, e)
+            except Exception:
+                log.exception("scan %s/%s crashed", owner, repo)
+        # Clean up the lock if no other task is waiting on it.
+        if not lock.locked() and f"{owner}/{repo}" in _repo_locks:
+            del _repo_locks[f"{owner}/{repo}"]
 
 
 def verify_signature(payload: bytes, signature: str, secret: str) -> bool:
