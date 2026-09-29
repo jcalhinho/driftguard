@@ -4,55 +4,144 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DriftGuard — The Dependabot for APIs</title>
-<meta name="description" content="DriftGuard scans your code for breaking API changes — retired AI models, removed endpoints, sunset SDKs, dead CI runners. Open source, free for everyone.">
+<meta name="description" content="DriftGuard scans your code for breaking API changes — retired AI models, removed endpoints, sunset SDKs, dead CI runners. 40% of top GitHub repos have broken API calls. Open source, free.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
 <style>
 :root {
   --bg: #0d1117;
   --bg-card: #161b22;
   --bg-input: #0d1117;
+  --bg-hover: #1c2128;
   --border: #30363d;
+  --border-light: #484f58;
   --text: #e6edf3;
   --text-muted: #8b949e;
+  --text-dim: #6e7681;
   --accent: #58a6ff;
   --accent-hover: #79c0ff;
+  --accent-dim: rgba(88,166,255,0.1);
   --red: #f85149;
   --orange: #d29922;
   --blue: #58a6ff;
   --green: #3fb950;
-  --radius: 8px;
+  --purple: #bc8cff;
+  --radius: 10px;
+  --radius-sm: 6px;
   --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
   --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --max-width: 960px;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
 body {
   font-family: var(--sans);
   background: var(--bg);
   color: var(--text);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
-a { color: var(--accent); text-decoration: none; }
-a:hover { text-decoration: underline; }
+a { color: var(--accent); text-decoration: none; transition: color 0.15s; }
+a:hover { color: var(--accent-hover); text-decoration: underline; }
+
+/* ── Nav ── */
+nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(13,17,23,0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+}
+nav .nav-inner {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+nav .logo {
+  font-weight: 800;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+}
+nav .logo:hover { text-decoration: none; }
+nav .nav-links {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+nav .nav-links a {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+nav .nav-links a:hover { color: var(--text); text-decoration: none; }
+nav .nav-cta {
+  background: #238636;
+  color: #fff !important;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: 1px solid #2ea043;
+  transition: background 0.15s;
+}
+nav .nav-cta:hover { background: #2ea043; text-decoration: none; }
 
 /* ── Hero ── */
 .hero {
   text-align: center;
-  padding: 80px 24px 60px;
-  max-width: 900px;
+  padding: 100px 24px 60px;
+  max-width: var(--max-width);
   margin: 0 auto;
+  position: relative;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(88,166,255,0.08) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: -1;
+}
+.hero .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent-dim);
+  border: 1px solid rgba(88,166,255,0.3);
+  color: var(--accent);
+  padding: 4px 14px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 24px;
 }
 .hero h1 {
-  font-size: 3rem;
+  font-size: 3.5rem;
   font-weight: 800;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.04em;
   margin-bottom: 16px;
+  line-height: 1.1;
 }
-.hero h1 .shield { font-size: 2.5rem; }
+.hero h1 .shield { font-size: 2.8rem; }
 .hero .tagline {
-  font-size: 1.3rem;
+  font-size: 1.35rem;
   color: var(--text-muted);
-  margin-bottom: 32px;
+  margin-bottom: 36px;
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
 }
 .hero .tagline strong { color: var(--text); }
 .hero-cta {
@@ -65,8 +154,8 @@ a:hover { text-decoration: underline; }
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 24px;
-  border-radius: var(--radius);
+  padding: 12px 28px;
+  border-radius: var(--radius-sm);
   font-weight: 600;
   font-size: 1rem;
   border: 1px solid var(--border);
@@ -83,19 +172,70 @@ a:hover { text-decoration: underline; }
   background: var(--bg-card);
   color: var(--text);
 }
-.btn-secondary:hover { border-color: var(--accent); text-decoration: none; }
-.btn code {
-  font-family: var(--mono);
-  font-size: 0.85rem;
-  background: rgba(255,255,255,0.1);
-  padding: 2px 6px;
-  border-radius: 4px;
+.btn-secondary:hover { border-color: var(--accent); text-decoration: none; background: var(--bg-hover); }
+
+/* ── Stats bar ── */
+.stats-bar {
+  max-width: var(--max-width);
+  margin: 0 auto 80px;
+  padding: 0 24px;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px 20px;
+}
+.stat-item {
+  text-align: center;
+}
+.stat-number {
+  font-size: 2.2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.stat-number.red { color: var(--red); }
+.stat-number.blue { color: var(--accent); }
+.stat-number.green { color: var(--green); }
+.stat-number.orange { color: var(--orange); }
+.stat-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.stat-sub {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+/* ── Section headers ── */
+.section-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+.section-header h2 {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 8px;
+}
+.section-header .subtitle {
+  color: var(--text-muted);
+  font-size: 1.05rem;
+  max-width: 560px;
+  margin: 0 auto;
 }
 
 /* ── Example ── */
 .example-section {
-  max-width: 900px;
-  margin: 0 auto 60px;
+  max-width: var(--max-width);
+  margin: 0 auto 80px;
   padding: 0 24px;
 }
 .example-box {
@@ -105,14 +245,15 @@ a:hover { text-decoration: underline; }
   overflow: hidden;
 }
 .example-header {
-  padding: 12px 16px;
+  padding: 10px 16px;
   border-bottom: 1px solid var(--border);
   font-family: var(--mono);
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   color: var(--text-muted);
   display: flex;
   align-items: center;
   gap: 8px;
+  background: var(--bg-hover);
 }
 .example-header .dot {
   width: 12px; height: 12px; border-radius: 50%;
@@ -121,36 +262,25 @@ a:hover { text-decoration: underline; }
 .example-header .dot.orange { background: var(--orange); }
 .example-header .dot.green { background: var(--green); }
 .example-code {
-  padding: 20px;
+  padding: 24px;
   font-family: var(--mono);
-  font-size: 0.9rem;
-  line-height: 1.7;
+  font-size: 0.85rem;
+  line-height: 1.8;
   overflow-x: auto;
 }
-.example-code .file { color: var(--accent); }
+.example-code .file { color: var(--accent); font-weight: 600; }
 .example-code .severity-critical { color: var(--red); font-weight: 600; }
 .example-code .severity-warning { color: var(--orange); font-weight: 600; }
-.example-code .line-num { color: var(--text-muted); }
+.example-code .line-num { color: var(--text-dim); }
 .example-code .match { color: var(--red); }
 .example-code .hint { color: var(--green); }
 .example-code .link { color: var(--accent); }
 
 /* ── Scanner ── */
 .scanner-section {
-  max-width: 900px;
+  max-width: var(--max-width);
   margin: 0 auto 80px;
   padding: 0 24px;
-}
-.scanner-section h2 {
-  font-size: 1.8rem;
-  font-weight: 700;
-  margin-bottom: 8px;
-  text-align: center;
-}
-.scanner-section .subtitle {
-  text-align: center;
-  color: var(--text-muted);
-  margin-bottom: 24px;
 }
 .scanner-box {
   background: var(--bg-card);
@@ -164,24 +294,25 @@ a:hover { text-decoration: underline; }
 }
 .scanner-input-wrap textarea {
   width: 100%;
-  min-height: 180px;
+  min-height: 200px;
   background: var(--bg-input);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: var(--text);
   font-family: var(--mono);
   font-size: 0.85rem;
-  padding: 12px;
+  padding: 14px;
   resize: vertical;
   outline: none;
   transition: border-color 0.15s;
+  line-height: 1.6;
 }
-.scanner-input-wrap textarea:focus { border-color: var(--accent); }
-.scanner-input-wrap textarea::placeholder { color: var(--text-muted); }
+.scanner-input-wrap textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+.scanner-input-wrap textarea::placeholder { color: var(--text-dim); }
 .scanner-controls {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   margin-top: 12px;
   flex-wrap: wrap;
 }
@@ -190,39 +321,42 @@ a:hover { text-decoration: underline; }
   color: var(--bg);
   border: none;
   font-weight: 700;
-  padding: 10px 28px;
-  border-radius: 6px;
+  padding: 10px 32px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 0.95rem;
-  transition: background 0.15s;
+  transition: all 0.15s;
 }
-.scanner-controls .btn-scan:hover { background: var(--accent-hover); }
-.scanner-controls .btn-scan:disabled { opacity: 0.5; cursor: default; }
+.scanner-controls .btn-scan:hover { background: var(--accent-hover); transform: translateY(-1px); }
+.scanner-controls .btn-scan:disabled { opacity: 0.5; cursor: default; transform: none; }
 .scanner-controls .btn-clear {
   background: transparent;
   color: var(--text-muted);
   border: 1px solid var(--border);
-  padding: 10px 16px;
-  border-radius: 6px;
+  padding: 10px 18px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 0.9rem;
+  transition: all 0.15s;
 }
-.scanner-controls .btn-clear:hover { color: var(--text); }
+.scanner-controls .btn-clear:hover { color: var(--text); border-color: var(--border-light); }
 .scanner-controls .sample-btn {
   background: transparent;
   color: var(--accent);
-  border: 1px dashed var(--border);
-  padding: 8px 14px;
-  border-radius: 6px;
+  border: 1px dashed var(--border-light);
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 0.85rem;
+  transition: all 0.15s;
 }
-.scanner-controls .sample-btn:hover { border-color: var(--accent); }
+.scanner-controls .sample-btn:hover { border-color: var(--accent); border-style: solid; }
 .scanner-status {
   padding: 8px 16px;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   color: var(--text-muted);
   font-family: var(--mono);
+  min-height: 34px;
 }
 .scanner-results {
   padding: 0;
@@ -230,73 +364,81 @@ a:hover { text-decoration: underline; }
   overflow-y: auto;
 }
 .scanner-results.empty {
-  padding: 40px;
+  padding: 48px;
   text-align: center;
-  color: var(--text-muted);
+  color: var(--text-dim);
 }
 .finding {
-  padding: 12px 16px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--border);
   font-family: var(--mono);
-  font-size: 0.85rem;
+  font-size: 0.82rem;
+  transition: background 0.1s;
 }
+.finding:hover { background: var(--bg-hover); }
 .finding:last-child { border-bottom: none; }
 .finding-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
 }
 .finding-badge {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 700;
   padding: 2px 8px;
   border-radius: 4px;
   text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .finding-badge.critical { background: rgba(248,81,73,0.15); color: var(--red); }
 .finding-badge.warning { background: rgba(210,153,34,0.15); color: var(--orange); }
 .finding-badge.info { background: rgba(88,166,255,0.15); color: var(--blue); }
 .finding-provider {
-  color: var(--text-muted);
-  font-size: 0.8rem;
+  color: var(--text-dim);
+  font-size: 0.78rem;
 }
 .finding-title {
   color: var(--text);
   font-weight: 600;
 }
 .finding-line {
-  margin-left: 8px;
-  color: var(--text-muted);
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: 0.78rem;
 }
 .finding-match {
-  margin-top: 4px;
-  padding: 4px 8px;
-  background: rgba(248,81,73,0.08);
+  margin-top: 6px;
+  padding: 6px 10px;
+  background: rgba(248,81,73,0.06);
   border-left: 3px solid var(--red);
   border-radius: 2px;
   white-space: pre-wrap;
   word-break: break-all;
+  color: var(--text);
 }
 .finding-hint {
-  margin-top: 4px;
+  margin-top: 6px;
   color: var(--green);
+  font-size: 0.8rem;
 }
 .finding-hint::before { content: "💡 "; }
 .finding-migration {
   margin-top: 4px;
-}
-.finding-migration a {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
 }
 .finding-migration::before { content: "🔗 "; }
 .scanner-summary {
-  padding: 12px 16px;
+  padding: 14px 16px;
   background: var(--bg-input);
   border-top: 1px solid var(--border);
   font-family: var(--mono);
   font-size: 0.85rem;
   color: var(--text-muted);
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 .scanner-summary .count-critical { color: var(--red); font-weight: 600; }
 .scanner-summary .count-warning { color: var(--orange); font-weight: 600; }
@@ -305,36 +447,26 @@ a:hover { text-decoration: underline; }
 
 /* ── Rules table ── */
 .rules-section {
-  max-width: 900px;
+  max-width: var(--max-width);
   margin: 0 auto 80px;
   padding: 0 24px;
-}
-.rules-section h2 {
-  font-size: 1.8rem;
-  font-weight: 700;
-  margin-bottom: 8px;
-  text-align: center;
-}
-.rules-section .subtitle {
-  text-align: center;
-  color: var(--text-muted);
-  margin-bottom: 24px;
 }
 .rules-filter {
   display: flex;
   gap: 8px;
   justify-content: center;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   flex-wrap: wrap;
 }
 .rules-filter button {
   background: var(--bg-card);
   border: 1px solid var(--border);
   color: var(--text-muted);
-  padding: 6px 14px;
+  padding: 6px 16px;
   border-radius: 20px;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 500;
   transition: all 0.15s;
 }
 .rules-filter button:hover { border-color: var(--accent); color: var(--text); }
@@ -357,75 +489,77 @@ a:hover { text-decoration: underline; }
 }
 .rules-table-wrap th {
   text-align: left;
-  padding: 10px 14px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--border);
   color: var(--text-muted);
   font-weight: 600;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  background: var(--bg-hover);
 }
 .rules-table-wrap td {
-  padding: 10px 14px;
+  padding: 10px 16px;
   border-bottom: 1px solid var(--border);
   vertical-align: top;
 }
 .rules-table-wrap tr:last-child td { border-bottom: none; }
-.rules-table-wrap tr:hover td { background: rgba(88,166,255,0.04); }
+.rules-table-wrap tr:hover td { background: rgba(88,166,255,0.03); }
 .sev-critical { color: var(--red); }
 .sev-warning { color: var(--orange); }
 .sev-info { color: var(--blue); }
 
 /* ── Features ── */
 .features-section {
-  max-width: 900px;
+  max-width: var(--max-width);
   margin: 0 auto 80px;
   padding: 0 24px;
 }
 .features-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
 }
 .feature-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 24px;
+  padding: 28px;
+  transition: border-color 0.15s, transform 0.15s;
 }
-.feature-card .icon { font-size: 2rem; margin-bottom: 12px; }
-.feature-card h3 { font-size: 1.1rem; margin-bottom: 8px; }
-.feature-card p { color: var(--text-muted); font-size: 0.9rem; }
+.feature-card:hover { border-color: var(--border-light); transform: translateY(-2px); }
+.feature-card .icon { font-size: 1.8rem; margin-bottom: 14px; }
+.feature-card h3 { font-size: 1.05rem; margin-bottom: 8px; }
+.feature-card p { color: var(--text-muted); font-size: 0.88rem; line-height: 1.5; }
 
 /* ── Install ── */
 .install-section {
-  max-width: 900px;
+  max-width: var(--max-width);
   margin: 0 auto 80px;
   padding: 0 24px;
 }
-.install-section h2 {
-  font-size: 1.8rem;
-  font-weight: 700;
-  margin-bottom: 24px;
-  text-align: center;
-}
 .install-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
 }
 .install-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 24px;
+  padding: 28px;
+  position: relative;
 }
-.install-card h3 { font-size: 1.1rem; margin-bottom: 12px; }
+.install-card.recommended {
+  border-color: #2ea043;
+  box-shadow: 0 0 0 1px rgba(46,160,67,0.2);
+}
+.install-card h3 { font-size: 1.05rem; margin-bottom: 12px; }
 .install-card .badge {
   display: inline-block;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 600;
-  padding: 2px 8px;
+  padding: 2px 10px;
   border-radius: 4px;
   background: rgba(63,185,80,0.15);
   color: var(--green);
@@ -434,50 +568,91 @@ a:hover { text-decoration: underline; }
 .install-card pre {
   background: var(--bg-input);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 12px;
+  border-radius: var(--radius-sm);
+  padding: 14px;
   font-family: var(--mono);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   overflow-x: auto;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 .install-card .copy-btn {
-  float: right;
-  background: transparent;
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  background: var(--bg-hover);
   border: 1px solid var(--border);
   color: var(--text-muted);
   padding: 4px 10px;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 0.75rem;
-  margin-bottom: 8px;
+  font-size: 0.72rem;
+  transition: all 0.15s;
 }
 .install-card .copy-btn:hover { color: var(--text); border-color: var(--accent); }
+.install-card p { color: var(--text-muted); font-size: 0.88rem; margin-bottom: 12px; }
 
 /* ── Footer ── */
 footer {
   text-align: center;
-  padding: 40px 24px;
+  padding: 48px 24px;
   border-top: 1px solid var(--border);
   color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: 0.88rem;
 }
 footer a { color: var(--accent); }
+footer .footer-links {
+  margin-top: 8px;
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
 
 /* ── Responsive ── */
-@media (max-width: 600px) {
-  .hero h1 { font-size: 2rem; }
-  .hero .tagline { font-size: 1.05rem; }
+@media (max-width: 768px) {
+  .hero { padding: 60px 20px 40px; }
+  .hero h1 { font-size: 2.4rem; }
+  .hero .tagline { font-size: 1.1rem; }
   .hero-cta { flex-direction: column; align-items: stretch; }
   .btn { justify-content: center; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 20px; padding: 20px 12px; }
+  .stat-number { font-size: 1.8rem; }
+  .section-header h2 { font-size: 1.5rem; }
+  .section-header .subtitle { font-size: 0.92rem; }
+  nav .nav-links a:not(.nav-cta) { display: none; }
   .rules-table-wrap { overflow-x: auto; }
+  .rules-table-wrap table { min-width: 500px; }
+  .finding-line { margin-left: 0; }
+}
+@media (max-width: 480px) {
+  .hero h1 { font-size: 2rem; }
+  .hero h1 .shield { font-size: 1.6rem; }
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+  .stat-number { font-size: 1.5rem; }
+  .example-code { font-size: 0.78rem; padding: 16px; }
+  .scanner-controls { gap: 8px; }
+  .scanner-controls .btn-scan { padding: 10px 20px; font-size: 0.88rem; }
 }
 </style>
 </head>
 <body>
 
+<!-- ═══════════════════════ NAV ═══════════════════════ -->
+<nav>
+  <div class="nav-inner">
+    <a class="logo" href="#"><span>🛡️</span> DriftGuard</a>
+    <div class="nav-links">
+      <a href="#scanner">Scanner</a>
+      <a href="#rules">Rules</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/jcalhinho/driftguard" target="_blank" rel="noopener">GitHub</a>
+      <a class="nav-cta" href="https://github.com/apps/driftguardbot" target="_blank" rel="noopener">Install App</a>
+    </div>
+  </div>
+</nav>
+
 <!-- ═══════════════════════ HERO ═══════════════════════ -->
 <section class="hero">
+  <div class="badge">📊 40% of top GitHub repos have broken API calls</div>
   <h1><span class="shield">🛡️</span> DriftGuard</h1>
   <p class="tagline">
     <strong>The Dependabot for APIs.</strong> Your code breaks when APIs change —
@@ -493,8 +668,38 @@ footer a { color: var(--accent); }
   </div>
 </section>
 
+<!-- ═══════════════════════ STATS ═══════════════════════ -->
+<section class="stats-bar">
+  <div class="stats-grid">
+    <div class="stat-item">
+      <div class="stat-number red">40%</div>
+      <div class="stat-label">Repos with broken APIs</div>
+      <div class="stat-sub">101 of 250 scanned</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-number">8,065</div>
+      <div class="stat-label">Total findings</div>
+      <div class="stat-sub">92% critical</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-number blue">53</div>
+      <div class="stat-label">Rules</div>
+      <div class="stat-sub">16 providers</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-number green">€0</div>
+      <div class="stat-label">Cost</div>
+      <div class="stat-sub">Free, open source</div>
+    </div>
+  </div>
+</section>
+
 <!-- ═══════════════════════ EXAMPLE ═══════════════════════ -->
 <section class="example-section">
+  <div class="section-header">
+    <h2>What it finds</h2>
+    <p class="subtitle">Retired AI models, removed endpoints, dead CI runners — with the migration guide for each.</p>
+  </div>
   <div class="example-box">
     <div class="example-header">
       <span class="dot red"></span>
@@ -525,9 +730,11 @@ footer a { color: var(--accent); }
 </section>
 
 <!-- ═══════════════════════ SCANNER ═══════════════════════ -->
-<section class="scanner-section">
-  <h2>Try it now — paste your code</h2>
-  <p class="subtitle">No install, no signup. The scanner runs in your browser. 53 rules, same as the CLI.</p>
+<section class="scanner-section" id="scanner">
+  <div class="section-header">
+    <h2>Try it now — paste your code</h2>
+    <p class="subtitle">No install, no signup. The scanner runs in your browser. 53 rules, same as the CLI.</p>
+  </div>
   <div class="scanner-box">
     <div class="scanner-input-wrap">
       <textarea id="codeInput" placeholder="Paste code here (Python, JavaScript, YAML, Go, Ruby, PHP, Java, C#, HTML, shell…)"></textarea>
@@ -546,9 +753,11 @@ footer a { color: var(--accent); }
 </section>
 
 <!-- ═══════════════════════ RULES TABLE ═══════════════════════ -->
-<section class="rules-section">
-  <h2>53 rules, 16 providers</h2>
-  <p class="subtitle">Every rule links to the official announcement. Rules are plain YAML — <a href="https://github.com/jcalhinho/driftguard/blob/main/CONTRIBUTING.md">contribute your own</a> in 10 minutes.</p>
+<section class="rules-section" id="rules">
+  <div class="section-header">
+    <h2>53 rules, 16 providers</h2>
+    <p class="subtitle">Every rule links to the official announcement. Rules are plain YAML — <a href="https://github.com/jcalhinho/driftguard/blob/main/CONTRIBUTING.md">contribute your own</a> in 10 minutes.</p>
+  </div>
   <div class="rules-filter" id="rulesFilter"></div>
   <div class="rules-table-wrap">
     <table>
@@ -567,6 +776,10 @@ footer a { color: var(--accent); }
 
 <!-- ═══════════════════════ FEATURES ═══════════════════════ -->
 <section class="features-section">
+  <div class="section-header">
+    <h2>How it stays trustworthy</h2>
+    <p class="subtitle">Issues by default. PRs only for safe mechanical fixes. No noise on every push.</p>
+  </div>
   <div class="features-grid">
     <div class="feature-card">
       <div class="icon">🔔</div>
@@ -584,7 +797,7 @@ footer a { color: var(--accent); }
       <p>The App downloads a tarball of the default branch into a temp dir and deletes it after. Nothing is executed.</p>
     </div>
     <div class="feature-card">
-      <div class="icon"> YAML</div>
+      <div class="icon">📝</div>
       <h3>Contributable rules</h3>
       <p>Rules are plain YAML — no Python needed. Add a provider's breaking change in 10 minutes.</p>
     </div>
@@ -602,10 +815,13 @@ footer a { color: var(--accent); }
 </section>
 
 <!-- ═══════════════════════ INSTALL ═══════════════════════ -->
-<section class="install-section">
-  <h2>Get started in 30 seconds</h2>
+<section class="install-section" id="install">
+  <div class="section-header">
+    <h2>Get started in 30 seconds</h2>
+    <p class="subtitle">Pick whichever fits your workflow. All three use the same 53 rules.</p>
+  </div>
   <div class="install-grid">
-    <div class="install-card">
+    <div class="install-card recommended">
       <span class="badge">Recommended</span>
       <h3>GitHub Action</h3>
       <button class="copy-btn" onclick="copyCode(this)">Copy</button>
@@ -631,9 +847,7 @@ driftguard rules</pre>
     </div>
     <div class="install-card">
       <h3>GitHub App</h3>
-      <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:12px;">
-        Install on your repos — it scans on every push to the default branch and opens issues or fix PRs automatically.
-      </p>
+      <p>Install on your repos — it scans on every push to the default branch and opens issues or fix PRs automatically.</p>
       <a class="btn btn-primary" href="https://github.com/apps/driftguardbot" target="_blank" rel="noopener" style="font-size:0.9rem;padding:8px 20px;">
         ⬇️ Install App
       </a>
@@ -644,17 +858,16 @@ driftguard rules</pre>
 <!-- ═══════════════════════ FOOTER ═══════════════════════ -->
 <footer>
   <p>DriftGuard — open source (MIT) — built by <a href="https://github.com/jcalhinho" target="_blank" rel="noopener">@jcalhinho</a></p>
-  <p style="margin-top:8px;">
-    <a href="https://github.com/jcalhinho/driftguard">GitHub</a> ·
-    <a href="https://github.com/jcalhinho/driftguard/blob/main/CONTRIBUTING.md">Contributing</a> ·
+  <div class="footer-links">
+    <a href="https://github.com/jcalhinho/driftguard">GitHub</a>
+    <a href="https://github.com/jcalhinho/driftguard/blob/main/CONTRIBUTING.md">Contributing</a>
     <a href="https://github.com/jcalhinho/driftguard/blob/main/SETUP.md">Self-hosting</a>
-  </p>
+  </div>
 </footer>
 
 <script>
 // ═══════════════════════════════════════════════════════════════════
 // DRIFTGUARD ONLINE SCANNER — same regex rules as the Python engine
-// Rules are embedded as JS objects (translated from rules.yaml)
 // ═══════════════════════════════════════════════════════════════════
 
 const RULES = [
@@ -755,11 +968,9 @@ function runScan() {
 
   const lines = code.split('\n');
   const findings = [];
-  let filesScanned = 1;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    // Check for inline suppression
     if (/driftguard:\s*ignore/.test(line)) continue;
 
     for (const rule of RULES) {
@@ -772,13 +983,12 @@ function runScan() {
             match: match[0],
             content: line.trim(),
           });
-          break; // one match per rule per line is enough
+          break;
         }
       }
     }
   }
 
-  // Render
   statusEl.textContent = `Scan complete — ${findings.length} finding${findings.length !== 1 ? 's' : ''}`;
 
   if (findings.length === 0) {
@@ -798,7 +1008,7 @@ function runScan() {
       <div class="finding-header">
         <span class="finding-badge ${sev}">${sev}</span>
         <span class="finding-provider">${f.rule.provider}</span>
-        <span class="finding-title">${f.rule.title}</span>
+        <span class="finding-title">${escapeHtml(f.rule.title)}</span>
         <span class="finding-line">L${f.line}</span>
       </div>
       <div class="finding-match">${escapeHtml(f.content)}</div>
@@ -808,8 +1018,8 @@ function runScan() {
   }
   resultsEl.innerHTML = html;
 
-  summaryEl.style.display = 'block';
-  summaryEl.innerHTML = `Found: <span class="count-critical">${counts.critical} critical</span> · <span class="count-warning">${counts.warning} warning</span> · <span class="count-info">${counts.info} info</span>`;
+  summaryEl.style.display = 'flex';
+  summaryEl.innerHTML = `<span class="count-critical">${counts.critical} critical</span><span class="count-warning">${counts.warning} warning</span><span class="count-info">${counts.info} info</span>`;
 }
 
 function clearAll() {
@@ -881,7 +1091,6 @@ function renderRulesTable(filter = 'all') {
   const tbody = document.getElementById('rulesBody');
   const filtered = filter === 'all' ? RULES : RULES.filter(r => r.provider === filter);
 
-  // Sort: provider, then severity (critical > warning > info), then title
   const sevOrder = { critical: 0, warning: 1, info: 2 };
   filtered.sort((a, b) => {
     if (a.provider !== b.provider) return a.provider.localeCompare(b.provider);
