@@ -21,8 +21,6 @@ inputs:
 
 runs:
   using: composite
-  permissions:
-    contents: read
   steps:
     - uses: actions/setup-python@v5
       with:

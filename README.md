@@ -23,6 +23,8 @@ on: [push, pull_request]
 jobs:
   scan:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: jcalhinho/driftguard@v1

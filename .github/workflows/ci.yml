@@ -26,6 +26,8 @@ jobs:
   dogfood:
     # Runs the published Action against this repo: validates action.yml end to end.
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: ./
