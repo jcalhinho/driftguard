@@ -2,7 +2,8 @@
 
 **The Dependabot for APIs.** Dependabot keeps your dependencies up to date — DriftGuard
 finds the API calls in your code that a provider has shut down or is about to: retired
-AI models, removed endpoints, sunset SDKs, dead CI runners.
+AI models, removed endpoints, sunset SDKs, dead CI runners. And it tells you when a provider
+page your code copies by hand — a price list, a log schema — changes ([Watch](#watch-provider-pages)).
 
 ```
 📄 src/llm.py
@@ -44,6 +45,7 @@ driftguard scan .                                   # human-readable report
 driftguard scan . --min-severity critical --format json
 driftguard scan . --ignore 'tests/**' --only OpenAI
 driftguard rules                                    # list the rules
+driftguard watch .                                  # watched provider pages that changed
 ```
 
 Exit code is `1` when something is found (use `--no-fail` to only report).
@@ -77,6 +79,67 @@ MODEL = "gpt-4-32k"  # driftguard: ignore — archived benchmark, never called
 
 **Severities** — 🔴 **critical**: calls fail today · 🟠 **warning**: shutdown announced or SDK
 unsupported · 🔵 **info**: legacy, plan the migration.
+
+## Watch provider pages
+
+Some drift is not in a call your code makes but in values it copies from a provider: a price table,
+context windows, the format of a log file written by a tool. List those pages under `watch` in
+`.driftguard.yml`:
+
+```yaml
+watch:
+  - id: anthropic-pricing
+    url: https://platform.claude.com/docs/en/about-claude/pricing.md
+    why: Claude prices in src/pricing.ts            # shown when it changes
+  - id: continue-log-writer
+    url: https://raw.githubusercontent.com/continuedev/continue/main/core/data/log.ts
+    start: "export class DataLogger"                # optional: only watch from here…
+    end: "export const"                             # …to here
+```
+
+`driftguard watch .` fetches each page, keeps its readable text (HTML tags, scripts and styles
+removed; Markdown and code as they are) and compares its SHA-256 with `.driftguard.lock.json`:
+
+| Status | Meaning |
+|---|---|
+| ✅ unchanged | Same text as when it was recorded. |
+| 🟠 changed | The text changed: check your code against it. |
+| 🟠 moved | The address now redirects somewhere else. |
+| 🔵 new | No fingerprint recorded yet (or the address changed in the list). |
+| 🔴 unreachable / no-section / empty | Error or 404, the `start`/`end` markers are gone, or nothing readable (a page drawn by JavaScript). |
+
+After reviewing a change and updating your code, record the new fingerprints and commit the lock file:
+
+```bash
+driftguard watch . --update
+git add .driftguard.lock.json
+```
+
+Prefer a page's **Markdown version** when the site offers one (often the page address plus `.md`): it
+has no menus around the content, so it only changes when the content does. For a file in a GitHub
+repository, watch its `raw.githubusercontent.com` address, and narrow it with `start` and `end` to the
+part you depend on. Exit code is `1` while something needs a look (`--no-fail` to only report).
+
+In the Action, run it on a schedule, since provider pages change without your code changing:
+
+```yaml
+on:
+  schedule:
+    - cron: "17 6 * * 1"   # every Monday
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jcalhinho/driftguard@v1
+        with:
+          scan: "false"
+          watch: "true"
+```
+
+The job fails and lists the pages to review in its summary; GitHub emails you about the failure.
 
 ## Rules covered (53)
 
@@ -154,7 +217,7 @@ Missing an API? Rules are plain YAML — see [CONTRIBUTING.md](./CONTRIBUTING.md
 ## Project layout
 
 ```
-driftguard/        # Engine + CLI: scanner, rules loader, fixer, reports
+driftguard/        # Engine + CLI: scanner, rules loader, fixer, reports, watch (provider pages)
 driftguard/data/   # The rules base (rules.yaml)
 app/               # GitHub App service (FastAPI): webhooks, issues, PRs
 action.yml         # GitHub Action

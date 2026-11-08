@@ -4,12 +4,15 @@ Usage:
   driftguard scan ./my-repo [--format text|json|github] [--min-severity warning]
                   [--only Stripe] [--ignore 'tests/**'] [--no-fail]
   driftguard rules
+  driftguard watch [path] [--update] [--format text|json|github] [--no-fail]
 """
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
+from . import watch as watcher
 from .config import SEVERITY_RANK, filter_findings, load_repo_config
 from .report import to_github, to_json, to_text
 from .rules import DEFAULT_RULES_FILE, RulesError, load_rules
@@ -58,7 +61,22 @@ def main(argv=None) -> int:
     rules_cmd.add_argument("--rules", default=str(DEFAULT_RULES_FILE), help="YAML rules file")
     rules_cmd.add_argument("--format", choices=["text", "markdown"], default="text")
 
+    watch_cmd = sub.add_parser(
+        "watch", help="Tell when a watched provider page or source file changed (see .driftguard.yml)",
+    )
+    watch_cmd.add_argument("path", nargs="?", default=".", help="Repository with .driftguard.yml")
+    watch_cmd.add_argument(
+        "--update", action="store_true",
+        help=f"Record the current fingerprints in {watcher.LOCK_FILE} (after reviewing the changes)",
+    )
+    watch_cmd.add_argument("--format", choices=["text", "json", "github"], default="text")
+    watch_cmd.add_argument("--timeout", type=float, default=20.0, help="Seconds per request")
+    watch_cmd.add_argument("--no-fail", action="store_true", help="Always exit 0 (report only)")
+
     args = parser.parse_args(argv)
+
+    if args.command == "watch":
+        return run_watch(args)
 
     try:
         rules = load_rules(getattr(args, "rules", str(DEFAULT_RULES_FILE)))
@@ -99,6 +117,44 @@ def main(argv=None) -> int:
 
     # CI-friendly exit code: 1 when at least one usage was found.
     return 1 if findings and not args.no_fail else 0
+
+
+def run_watch(args) -> int:
+    path = Path(args.path)
+    if not path.is_dir():
+        print(f"❌ Path not found: {path}", file=sys.stderr)
+        return 2
+    try:
+        sources = watcher.load_sources(path)
+        if not sources:
+            print(f"No `watch` list in {path / watcher.CONFIG_FILE}: nothing to check.")
+            return 0
+        results = watcher.run(path, lambda url: watcher.fetch(url, timeout=args.timeout))
+        if args.update:
+            watcher.save_lock(path, results)
+    except watcher.WatchError as e:
+        print(f"❌ {e}", file=sys.stderr)
+        return 2
+
+    if args.format == "json":
+        print(watcher.to_json(results))
+    elif args.format == "github":
+        print(watcher.to_github(results))
+        summary = os.environ.get("GITHUB_STEP_SUMMARY")
+        if summary:
+            with open(summary, "a", encoding="utf-8") as handle:
+                handle.write(watcher.summary_markdown(results))
+    else:
+        print(watcher.to_text(results))
+    if args.update:
+        print(f"Fingerprints recorded in {path / watcher.LOCK_FILE}.")
+
+    # After --update, only sources that could not be read still need attention.
+    unresolved = [
+        r for r in results
+        if r.needs_review and (not args.update or r.status in watcher.UNREADABLE)
+    ]
+    return 1 if unresolved and not args.no_fail else 0
 
 
 if __name__ == "__main__":
